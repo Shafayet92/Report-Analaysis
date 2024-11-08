@@ -140,3 +140,25 @@ document.addEventListener("DOMContentLoaded", function () {
         localStorage.setItem("nightMode", isNightModeEnabled.toString());
     });
 });
+
+
+// Get the button and the div containing the customization options
+const toggleButton = document.getElementById('toggleCustomization');
+const customizationOptions = document.getElementById('customizationOptions');
+
+// Set an initial state for showing or hiding
+let isVisible = true;
+
+// Add an event listener to toggle the visibility when clicked
+toggleButton.addEventListener('click', function () {
+    // Toggle the visibility of the customization options
+    if (isVisible) {
+        customizationOptions.style.display = 'none';
+        toggleButton.innerHTML = 'Hide Customization';
+    } else {
+        customizationOptions.style.display = 'block';
+        toggleButton.innerHTML = 'Show Customization';
+    }
+    isVisible = !isVisible; // Toggle the visibility state
+});
+
