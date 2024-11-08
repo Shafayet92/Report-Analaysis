@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Report Dashboard</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/reportdashboard.css') }}"
+    />
+  </head>
+  <body>
+    <div id="alert" class="alert alert-success">
+      Report generated successfully!
+    </div>
+
+    <div class="navigation">
+      <button class="nav-button active" data-tab="query">
+        <span>📝</span>
+        Query Engine
+      </button>
+      <button class="nav-button" data-tab="results">
+        <span>📄</span>
+        Results
+      </button>
+      <button class="nav-button" data-tab="visualize">
+        <span>📊</span>
+        Visualize</button
+      ><button id="toggleNightMode" class="nav-button">🌙 Night Mode</button>
+    </div>
+
+    <div class="main-content">
+      <div class="left-panel">
+        <div class="card">
+          <h2 class="card-title">Report Generator</h2>
+          <form id="reportForm">
+            <div class="form-group">
+              <label class="form-label">Ask a Query</label>
+              <textarea
+                class="form-control"
+                rows="4"
+                placeholder="Type your question or query here"
+              ></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Upload Data Files</label>
+              <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📎</div>
+                <div>Drop files here or click to upload</div>
+                <div
+                  style="font-size: 0.75rem; color: #6b7280; margin-top: 0.5rem"
+                >
+                  Accepted: PDF, Excel, CSV, DOCX
+                </div>
+                <input
+                  type="file"
+                  id="fileUpload"
+                  multiple
+                  style="display: none"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                "
+              >
+                <label class="form-label">Customization Options</label>
+                <button
+                  type="button"
+                  id="toggleCustomization"
+                  class="btn"
+                  style="color: #2563eb; background: none"
+                >
+                  Show Customization
+                </button>
+              </div>
+
+              <div id="customizationOptions" style="display: none">
+                <!-- Customization options content here -->
+                <div id="summary-controls">
+                  <div class="form-group">
+                    <label class="form-label">Summary Type:</label>
+                    <select>
+                      <option>Descriptive (Objective)</option>
+                      <option>Evaluative (Opinionated)</option>
+                      <option>Analytical</option>
+                      <option>Critical</option>
+                      <option>Comparative</option>
+                      <option>Simplified (Layman-Friendly)</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Summary Page Length:</label>
+                    <div style="display: flex; align-items: center">
+                      <input
+                        value="1"
+                        type="range"
+                        min="1"
+                        max="20"
+                        id="summary-length-slider"
+                      />
+                      <input
+                        value="1"
+                        type="number"
+                        min="1"
+                        max="20"
+                        id="summary-length-value"
+                        style="width: 50px; margin-left: 10px"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Summary Format:</label>
+                  <select id="summary-format">
+                    <option value="paragraph">Paragraph</option>
+                    <option value="bullet">Bullet Points</option>
+                    <option value="numbered">Numbered List</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Select Data Fields</label>
+                  <div class="checkbox-group">
+                    <input type="checkbox" id="nearMiss" checked />
+                    <label for="nearMiss">Near Miss</label>
+                  </div>
+                  <div class="checkbox-group">
+                    <input type="checkbox" id="incidentReports" checked />
+                    <label for="incidentReports">Incident Reports</label>
+                  </div>
+                  <div class="checkbox-group">
+                    <input type="checkbox" id="safetyCulture" checked />
+                    <label for="safetyCulture">Safety Culture</label>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Filter Data</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    placeholder="Date (e.g., 2024-01-01)"
+                    style="margin-bottom: 0.5rem"
+                  />
+                  <input
+                    type="text"
+                    class="form-control"
+                    placeholder="Location (e.g., Ship ID)"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="generateButton">
+              Generate Report
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="right-panel">
+        <div class="card">
+          <h2 class="card-title">Quick Actions</h2>
+          <div class="quick-action"><span>⬇️</span> Export Report</div>
+          <div class="quick-action"><span>🔍</span> Save Filters</div>
+        </div>
+
+        <div class="card" style="margin-top: 1rem">
+          <h2 class="card-title">Processing Stats</h2>
+          <div class="stats-item">
+            <div class="stats-label">Files Processed</div>
+            <div class="stats-value" id="filesProcessed">0</div>
+          </div>
+          <div class="stats-item">
+            <div class="stats-label">Selected Fields</div>
+            <div class="stats-value" id="selectedFields">0</div>
+          </div>
+          <div class="stats-item">
+            <div class="stats-label">Last Updated</div>
+            <div
+              class="stats-value"
+              style="font-size: 0.875rem"
+              id="lastUpdated"
+            >
+              Never
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/reportdashboard.js') }}"></script>
+  </body>
+</html>
