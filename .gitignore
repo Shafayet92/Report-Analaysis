@@ -1,0 +1,73 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environment
+venv/
+ENV/
+env/
+.venv/
+.pipenv/
+
+# Flask cache and debug files
+instance/
+*.pyo
+*.pyd
+*.pdb
+
+# Flask uploads folder
+uploads/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.installed.cfg
+*.egg
+*.whl
+
+# Pytest cache
+.pytest_cache/
+.cache/
+
+# Jupyter Notebook files
+.ipynb_checkpoints
+
+# VS Code settings
+.vscode/
+
+# MyPy cache
+.mypy_cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+
+# Pyre type checker
+.pyre/
+
+# Django stuff (if applicable)
+*.log
+staticfiles/
+local_settings.py
+db.sqlite3
+
+# Environment variables file
+.env
+.env.*
+
+# MacOS files
+.DS_Store
