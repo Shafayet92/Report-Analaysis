@@ -71,6 +71,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 3000);
     });
 
+
     // Update Selected Fields Count
     const checkboxes = document.querySelectorAll('input[type="checkbox"]');
     const selectedFieldsCount = document.getElementById('selectedFields');
