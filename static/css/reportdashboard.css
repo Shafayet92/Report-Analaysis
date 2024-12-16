@@ -253,3 +253,139 @@ body,
 button {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
+
+.file-actions {
+  display: flex;
+  gap: 10px; /* Spacing between the buttons */
+  margin-top: 10px; /* Add some space above the buttons */
+}
+
+.file-card {
+  padding: 1rem;
+  border: 1px solid #e5e7eb; /* Light gray border */
+  border-radius: 0.5rem; /* Rounded corners for card */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background-color: #ffffff; /* White background */
+}
+
+.download-btn {
+  background-color: #2563eb; /* Blue background for Download */
+  color: #ffffff;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  text-decoration: none;
+  text-align: center;
+}
+
+.delete-file {
+  background-color: #dc2626; /* Red background for Delete */
+  color: #ffffff;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.delete-file:hover {
+  background-color: #b91c1c; /* Darker red on hover */
+}
+
+.download-btn:hover {
+  background-color: #1e40af; /* Darker blue on hover */
+}
+
+/* Progress Bar */
+.progress-container {
+  width: 100%;
+  margin-top: 20px;
+}
+
+#progressBarContainer {
+  background-color: #e5e7eb; /* Light gray background for progress container */
+  border-radius: 0.25rem;
+  overflow: hidden;
+  width: 100%;
+  height: 1rem;
+  position: relative;
+}
+
+#progressBar {
+  width: 0%;
+  height: 100%;
+  background-color: #2563eb; /* Blue progress bar */
+  transition: width 0.4s ease; /* Smooth progress */
+}
+
+#progressText {
+  text-align: center;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  color: #6b7280; /* Gray text color for progress */
+}
+
+/* Table Styling */
+#similarityTable {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #d1d5db; /* Light gray border */
+  background-color: white;
+}
+
+#similarityTable th,
+#similarityTable td {
+  text-align: left;
+  padding: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+#similarityTable th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+  color: #374151;
+}
+
+#similarityTable tr:hover {
+  background-color: #f9fafb; /* Light hover effect */
+}
+
+/* Summary Button */
+#summaryButtonContainer {
+  margin-top: 20px;
+  text-align: right;
+}
+
+#summaryButton {
+  background-color: #2563eb; /* Primary blue button */
+  color: #ffffff;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+#summaryButton:hover {
+  background-color: #1e3a8a; /* Darker blue on hover */
+}
+
+#summaryContainer {
+  font-family: Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  margin-top: 20px;
+}
+
+#summaryContainer ul {
+  list-style-type: decimal;
+  margin-left: 20px;
+}
+
+#summaryContainer li {
+  margin-bottom: 8px;
+}
+
+#summaryContainer strong {
+  font-weight: bold;
+}
