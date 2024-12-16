@@ -8,25 +8,31 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='css/reportdashboard.css') }}"
     />
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.dataTables.min.css"
+    />
   </head>
   <body>
-    <div id="alert" class="alert alert-success">
-      Report generated successfully!
+    <div id="alert" class="alert alert-success" style="display: none">
+      File uploaded successfully!
     </div>
 
     <div class="navigation">
       <button class="nav-button active" data-tab="query">
-        <span>📝</span>
-        Query Engine
+        <span>📝</span> Query Engine
       </button>
       <button class="nav-button" data-tab="results">
-        <span>📄</span>
-        Results
+        <span>📄</span> Results
       </button>
       <button class="nav-button" data-tab="visualize">
-        <span>📊</span>
-        Visualize</button
-      ><button id="toggleNightMode" class="nav-button">🌙 Night Mode</button>
+        <span>📊</span> Visualize
+      </button>
+      <button id="toggleNightMode" class="nav-button">🌙 Night Mode</button>
     </div>
 
     <div class="main-content">
@@ -38,9 +44,23 @@
               <label class="form-label">Ask a Query</label>
               <textarea
                 class="form-control"
+                id="queryInput"
                 rows="4"
                 placeholder="Type your question or query here"
               ></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="similarity-amount"
+                >Similarity Data Amount</label
+              >
+              <input
+                type="number"
+                id="similarity-amount"
+                class="form-control"
+                placeholder="Enter amount"
+                value=""
+                required
+              />
             </div>
 
             <div class="form-group">
@@ -63,104 +83,10 @@
             </div>
 
             <div class="form-group">
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                "
-              >
-                <label class="form-label">Customization Options</label>
-                <button
-                  type="button"
-                  id="toggleCustomization"
-                  class="btn"
-                  style="color: #2563eb; background: none"
-                >
-                  Show Customization
-                </button>
-              </div>
-
-              <div id="customizationOptions" style="display: none">
-                <!-- Customization options content here -->
-                <div id="summary-controls">
-                  <div class="form-group">
-                    <label class="form-label">Summary Type:</label>
-                    <select>
-                      <option>Descriptive (Objective)</option>
-                      <option>Evaluative (Opinionated)</option>
-                      <option>Analytical</option>
-                      <option>Critical</option>
-                      <option>Comparative</option>
-                      <option>Simplified (Layman-Friendly)</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Summary Page Length:</label>
-                    <div style="display: flex; align-items: center">
-                      <input
-                        value="1"
-                        type="range"
-                        min="1"
-                        max="20"
-                        id="summary-length-slider"
-                      />
-                      <input
-                        value="1"
-                        type="number"
-                        min="1"
-                        max="20"
-                        id="summary-length-value"
-                        style="width: 50px; margin-left: 10px"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Summary Format:</label>
-                  <select id="summary-format">
-                    <option value="paragraph">Paragraph</option>
-                    <option value="bullet">Bullet Points</option>
-                    <option value="numbered">Numbered List</option>
-                  </select>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Select Data Fields</label>
-                  <div class="checkbox-group">
-                    <input type="checkbox" id="nearMiss" checked />
-                    <label for="nearMiss">Near Miss</label>
-                  </div>
-                  <div class="checkbox-group">
-                    <input type="checkbox" id="incidentReports" checked />
-                    <label for="incidentReports">Incident Reports</label>
-                  </div>
-                  <div class="checkbox-group">
-                    <input type="checkbox" id="safetyCulture" checked />
-                    <label for="safetyCulture">Safety Culture</label>
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Filter Data</label>
-                  <input
-                    type="text"
-                    class="form-control"
-                    placeholder="Date (e.g., 2024-01-01)"
-                    style="margin-bottom: 0.5rem"
-                  />
-                  <input
-                    type="text"
-                    class="form-control"
-                    placeholder="Location (e.g., Ship ID)"
-                  />
-                </div>
-              </div>
+              <button type="button" class="btn btn-primary" id="generateButton">
+                Search Similarity
+              </button>
             </div>
-
-            <button type="submit" class="btn btn-primary" id="generateButton">
-              Generate Report
-            </button>
           </form>
         </div>
       </div>
@@ -175,11 +101,11 @@
         <div class="card" style="margin-top: 1rem">
           <h2 class="card-title">Processing Stats</h2>
           <div class="stats-item">
-            <div class="stats-label">Files Processed</div>
+            <div class="stats-label">File Uploaded</div>
             <div class="stats-value" id="filesProcessed">0</div>
           </div>
           <div class="stats-item">
-            <div class="stats-label">Selected Fields</div>
+            <div class="stats-label">Stored Files</div>
             <div class="stats-value" id="selectedFields">0</div>
           </div>
           <div class="stats-item">
@@ -193,9 +119,56 @@
             </div>
           </div>
         </div>
+
+        <div id="fileCardsContainer" class="card" style="margin-top: 1rem">
+          <h2 class="card-title">Uploaded Files</h2>
+          <div id="fileCardsList">
+            <!-- Dynamic file cards will be inserted here -->
+          </div>
+        </div>
       </div>
     </div>
 
+    <div class="card" style="margin-top: 1rem">
+      <div id="summaryContainer" class="card"></div>
+
+      <div class="progress-container">
+        <div id="progressBarContainer" style="display: none">
+          <div id="progressBar"></div>
+        </div>
+        <p id="progressText" style="display: none">0% Analysis</p>
+      </div>
+
+      <div id="resultsContainer" style="margin-top: 20px">
+        <table
+          id="similarityTable"
+          class="table table-bordered table-hover dt-responsive nowrap"
+          style="width: 100%"
+        >
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>Result</th>
+              <th>Relevance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dynamic rows will be appended here -->
+          </tbody>
+        </table>
+      </div>
+      <div class="form-group" id="summaryButtonContainer">
+        <button type="button" class="btn btn-primary" id="summaryButton">
+          Generate Summary
+        </button>
+      </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
     <script src="{{ url_for('static', filename='js/reportdashboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/generate_report.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/summary.js') }}"></script>
   </body>
 </html>

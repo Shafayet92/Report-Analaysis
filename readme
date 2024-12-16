@@ -1,0 +1,21 @@
+Flask App Installation Guide
+
+1. Clone the Repository
+   git clone https://github.com/yourusername/your-flask-app.git
+   cd your-flask-app
+
+2. Set Up a Virtual Environment (Optional)
+   python -m venv venv
+   For Windows: .\venv\Scripts\activate
+   For macOS/Linux: source venv/bin/activate
+
+3. Install Dependencies
+   pip install -r requirements.txt
+
+4. Run the Flask App
+   Set environment variables:
+   For Windows: set FLASK_APP=app.py && set FLASK_ENV=development
+   For macOS/Linux: export FLASK_APP=app.py && export FLASK_ENV=development
+   Run the app: flask run
+
+   The app will be available at http://127.0.0.1:5000/
