@@ -6,7 +6,7 @@ import time
 import threading
 import subprocess
 import logging
-from vectorization import VectorStore, process_file, vectorize_and_search  # Importing your vectorization classes and functions
+from vectorization import VectorStore, convert_to_serializable, process_file, vectorize_and_search  # Importing your vectorization classes and functions
 from summary import generate_formatted_output, generate_recommendations, generate_summary  # Import the function from summary.py
 
 
@@ -138,11 +138,17 @@ def generate_report():
     threading.Thread(target=run_analysis).start()
     return jsonify({"message": "Analysis started"}), 202
 
-
 @app.route('/get_progress', methods=['GET'])
 def get_progress():
     with lock:
-        return jsonify(progress_data)
+        try:
+            # Ensure progress_data is JSON-serializable
+            serializable_data = convert_to_serializable(progress_data)
+            return jsonify(serializable_data)
+        except Exception as e:
+            # Log the error and return an error response
+            logging.error(f"Error in get_progress: {e}")
+            return jsonify({"error": "An error occurred"}), 500
 
 
 # @app.route('/generate_summary', methods=['POST'])
