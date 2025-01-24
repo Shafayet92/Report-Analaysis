@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Report Dashboard</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/reportdashboard.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/report.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/anim.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.dataTables.min.css"
+    />
+
+    <script src="{{ url_for('static', filename='js/nightmode.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/file.js') }}"></script>
+
+    <script src="{{ url_for('static', filename='js/navigation.js') }}"></script>
+
+    <script src="{{ url_for('static', filename='js/generate_report.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/summary.js') }}"></script>
+
+    <!-- Include jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+
+    <!-- Include docx.js for DOCX generation -->
+    <script src="https://cdn.jsdelivr.net/npm/docx@7.5.0/build/index.js"></script>
+    <!-- Include your custom print.js -->
+    <script src="static/js/print.js"></script>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  </head>
+  <body>
+    <div id="alert" class="alert alert-success" style="display: none">
+      File uploaded successfully!
+    </div>
+
+    <div class="navigation">
+      <button class="nav-button active" data-tab="query">
+        <span>📝</span> Query Engine
+      </button>
+      <button class="nav-button" data-tab="records">
+        <span>📄</span> Records
+      </button>
+      <button class="nav-button" data-tab="report">
+        <span>📊</span> Report
+      </button>
+      <button id="toggleNightMode" type="button">🌙 Night Mode</button>
+    </div>
+
+    <div class="main-content">
+      <!-- Left Panel (Dynamic) -->
+      <div id="left-panel">
+        <!-- Default content (Query Engine) will be loaded dynamically -->
+
+        <div class="tab-content1 active">
+          <div class="card">
+            <h2 class="card-title">Query Engine</h2>
+            <form id="reportForm">
+              <div class="form-group">
+                <label class="form-label">Ask a Query</label>
+                <textarea
+                  class="form-control"
+                  id="queryInput"
+                  rows="4"
+                  placeholder="Type your question or query here"
+                ></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="similarity-amount"
+                  >Similarity Data Amount</label
+                >
+                <input
+                  type="number"
+                  id="similarity-amount"
+                  class="form-control"
+                  placeholder="Enter amount"
+                  value=""
+                  required
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Upload Data Files</label>
+                <div class="upload-area" id="uploadArea">
+                  <div class="upload-icon">📎</div>
+                  <div>Drop files here or click to upload</div>
+                  <div
+                    style="
+                      font-size: 0.75rem;
+                      color: #6b7280;
+                      margin-top: 0.5rem;
+                    "
+                  >
+                    Accepted: PDF, Excel, CSV, DOCX
+                  </div>
+                  <input
+                    type="file"
+                    id="fileUpload"
+                    multiple
+                    style="display: none"
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  id="generateButton"
+                >
+                  Search Similarity
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="tab-content2">
+          <div class="card">
+            <h2 class="card-title">Records</h2>
+
+            <div class="progress-container">
+              <div id="progressBarContainer" style="display: none">
+                <div id="progressBar"></div>
+              </div>
+              <p id="progressText" style="display: none">0% Analysis</p>
+            </div>
+
+            <div id="resultsContainer" style="margin-top: 20px">
+              <table
+                id="similarityTable"
+                class="table table-bordered table-hover dt-responsive nowrap"
+                style="width: 100%"
+              >
+                <thead>
+                  <tr>
+                    <th>No</th>
+                    <th>Result</th>
+                    <th>Relevance</th>
+                  </tr>
+                </thead>
+                <tbody id="resultsTableBody">
+                  <!-- Dynamic rows will be appended here -->
+                </tbody>
+              </table>
+            </div>
+            <div class="form-group" id="summaryButtonContainer">
+              <button type="button" class="btn btn-primary" id="summaryButton">
+                Generate Report
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-content3">
+          <div class="card">
+            <h2 class="card-title">Report</h2>
+            <div class="report-actions">
+              <button class="btn-report btn-pdf">
+                <img
+                  src="{{ url_for('static', filename='img/PDF_file_icon.svg.png') }}"
+                  alt="PDF"
+                  class="btn-icon"
+                />
+                PDF
+              </button>
+              <button class="btn-report btn-doc">
+                <img
+                  src="{{ url_for('static', filename='img/docx_icon.svg.png') }}"
+                  alt="DOCX"
+                  class="btn-icon"
+                />
+                DOCX
+              </button>
+              <button class="btn-report btn-print">🖨️ Print Report</button>
+            </div>
+
+            <div id="summaryContainer" class="card">
+              Generated report content will be displayed here...
+              <div class="loader-wrapper" style="display: none">
+                <div class="loader-container">
+                  <div class="loader-bar">
+                    <div class="loader-fill" id="loaderFill"></div>
+                    <div class="loader-text" id="loaderText">0%</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel (Fixed) -->
+      <div class="right-panel">
+        <div class="card">
+          <h2 class="card-title">Quick Actions</h2>
+          <div class="quick-action"><span>⬇️</span> Export Report</div>
+          <div class="quick-action"><span>🔍</span> Save Filters</div>
+        </div>
+
+        <div class="card" style="margin-top: 1rem">
+          <h2 class="card-title">Processing Stats</h2>
+          <div class="stats-item">
+            <div class="stats-label">File Uploaded</div>
+            <div class="stats-value" id="filesProcessed">0</div>
+          </div>
+          <div class="stats-item">
+            <div class="stats-label">Stored Files</div>
+            <div class="stats-value" id="selectedFields">0</div>
+          </div>
+          <div class="stats-item">
+            <div class="stats-label">Last Updated</div>
+            <div
+              class="stats-value"
+              style="font-size: 0.875rem"
+              id="lastUpdated"
+            >
+              Never
+            </div>
+          </div>
+        </div>
+
+        <div id="fileCardsContainer" class="card" style="margin-top: 1rem">
+          <h2 class="card-title">Uploaded Files</h2>
+          <div id="fileCardsList">
+            <!-- Dynamic file cards will be inserted here -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

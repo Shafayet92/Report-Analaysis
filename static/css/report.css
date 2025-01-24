@@ -1,0 +1,59 @@
+/* Container for buttons */
+.report-actions {
+  display: flex;
+  justify-content: flex-end; /* Align buttons to the right */
+  gap: 15px;
+  margin-top: 15px;
+  margin-bottom: 20px;
+}
+
+/* General button style */
+.btn-report {
+  padding: 8px 18px;
+  font-size: 1rem;
+  font-weight: normal;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.3s, transform 0.2s;
+  color: #fff;
+  display: flex;
+  align-items: center; /* Center content vertically */
+}
+
+/* Image icon style */
+.btn-icon {
+  width: 20px; /* Set the width of the icon */
+  height: 20px; /* Set the height of the icon */
+  margin-right: 10px; /* Space between the icon and text */
+}
+
+/* Button for PDF download */
+.btn-pdf {
+  background-color: #6a9abf; /* Light Blue */
+}
+
+.btn-pdf:hover {
+  background-color: #548aa1;
+  transform: scale(1.05);
+}
+
+/* Button for DOCX download */
+.btn-doc {
+  background-color: #81c784; /* Light Green */
+}
+
+.btn-doc:hover {
+  background-color: #66bb6a;
+  transform: scale(1.05);
+}
+
+/* Button for printing */
+.btn-print {
+  background-color: #ffb74d; /* Light Orange */
+}
+
+.btn-print:hover {
+  background-color: #ffa726;
+  transform: scale(1.05);
+}

@@ -145,27 +145,27 @@ document.addEventListener('DOMContentLoaded', function () {
     displayFiles();
 });
 
-// Slider and Input Synchronization
-const slider = document.getElementById("summary-length-slider");
-const numberInput = document.getElementById("summary-length-value");
+// // Slider and Input Synchronization
+// const slider = document.getElementById("summary-length-slider");
+// const numberInput = document.getElementById("summary-length-value");
 
-// Initialize number input value to match slider
-numberInput.value = slider.value;
+// // Initialize number input value to match slider
+// numberInput.value = slider.value;
 
-// Update number input when slider changes
-slider.addEventListener("input", () => {
-    numberInput.value = slider.value;
-});
+// // Update number input when slider changes
+// slider.addEventListener("input", () => {
+//     numberInput.value = slider.value;
+// });
 
-// Update slider when number input changes
-numberInput.addEventListener("input", () => {
-    // Ensure number input stays within slider range
-    if (numberInput.value < slider.min)
-        numberInput.value = slider.min;
-    if (numberInput.value > slider.max)
-        numberInput.value = slider.max;
-    slider.value = numberInput.value;
-});
+// // Update slider when number input changes
+// numberInput.addEventListener("input", () => {
+//     // Ensure number input stays within slider range
+//     if (numberInput.value < slider.min)
+//         numberInput.value = slider.min;
+//     if (numberInput.value > slider.max)
+//         numberInput.value = slider.max;
+//     slider.value = numberInput.value;
+// });
 
 
 
@@ -343,21 +343,21 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 });
 
-// Customization Toggle
-const toggleButton = document.getElementById('toggleCustomization');
-const customizationOptions = document.getElementById('customizationOptions');
-let isVisible = true;
+// // Customization Toggle
+// const toggleButton = document.getElementById('toggleCustomization');
+// const customizationOptions = document.getElementById('customizationOptions');
+// let isVisible = true;
 
-toggleButton.addEventListener('click', function () {
-    if (isVisible) {
-        customizationOptions.style.display = 'none';
-        toggleButton.innerHTML = 'Hide Customization';
-    } else {
-        customizationOptions.style.display = 'block';
-        toggleButton.innerHTML = 'Show Customization';
-    }
-    isVisible = !isVisible;
-});
+// toggleButton.addEventListener('click', function () {
+//     if (isVisible) {
+//         customizationOptions.style.display = 'none';
+//         toggleButton.innerHTML = 'Hide Customization';
+//     } else {
+//         customizationOptions.style.display = 'block';
+//         toggleButton.innerHTML = 'Show Customization';
+//     }
+//     isVisible = !isVisible;
+// });
 
 // document.addEventListener('DOMContentLoaded', function () {
 //     const generateButton = document.getElementById('generateButton');
@@ -480,3 +480,4 @@ toggleButton.addEventListener('click', function () {
 //         }
 //     }
 // });
+

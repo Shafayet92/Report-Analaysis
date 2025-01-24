@@ -1,5 +1,5 @@
 import json
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, Response, request, jsonify, render_template
 from werkzeug.utils import secure_filename
 import os
 import time
@@ -33,7 +33,18 @@ def allowed_file(filename):
 
 @app.route('/')
 def index():
+    return render_template('base.html')
     return render_template('reportdashboard.html')
+
+
+
+@app.route('/content/<tab_name>')
+def load_tab_content(tab_name):
+    # Return the HTML content for the requested tab
+    try:
+        return render_template(f"{tab_name}.html")
+    except:
+        return "Content not found", 404
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -151,37 +162,11 @@ def get_progress():
             return jsonify({"error": "An error occurred"}), 500
 
 
-# @app.route('/generate_summary', methods=['POST'])
-# def generate_summary_subprocess():
-#     try:
-#         # Get the data (similarity results) from the request
-#         data = request.json.get('data', [])
-
-#         # Call summary.py with the JSON-formatted data
-#         result = subprocess.run(
-#             ['python', 'summary.py'],
-#             input=json.dumps(data).encode(),
-#             capture_output=True,
-#             text=True
-#         )
-
-#         if result.returncode == 0:
-#             # Get the generated summary from the output
-#             summary = result.stdout.strip()
-#             return jsonify({'success': True, 'summary': summary})
-#         else:
-#             logging.error(f"Error in summary.py: {result.stderr}")
-#             return jsonify({'success': False, 'error': 'Summary generation failed.'})
-
-#     except Exception as e:
-#         logging.error(f"Error in /generate_summary: {str(e)}")
-#         return jsonify({'success': False, 'error': 'An error occurred.'})
-
 
 @app.route('/generate_summary', methods=['POST'])
 def generate_summary_subprocess():
     try:
-        # Retrieve data and query from the request
+        # Retrieve data and query from the request - task 1
         data = request.json.get('data', [])
         query = request.json.get('query')
 
@@ -189,31 +174,31 @@ def generate_summary_subprocess():
         print(f"Received data: {data}")
         print(f"Received query: {query}")
 
-        # Validate input
+        # Validate input - task 2
         if not isinstance(data, list):
             return jsonify({'success': False, 'error': 'Invalid input format, expected a list.'})
 
         if not query or not isinstance(query, str):
             return jsonify({'success': False, 'error': 'Query is required and should be a string.'})
 
-        # Generate the summary
+        # Generate the summary - task 3
         summary = generate_summary(data, query)
 
-        # Check for errors in summary generation
+        # Check for errors in summary generation - task 4
         if isinstance(summary, str) and summary.startswith("Error"):
             return jsonify({'success': False, 'error': summary})
 
-        # Generate recommendations based on the summary
+        # Generate recommendations based on the summary - task 5
         recommendations = generate_recommendations(summary)
 
-        # Check for errors in recommendations generation
+        # Check for errors in recommendations generation - task 6
         if isinstance(recommendations, str) and recommendations.startswith("Error"):
             return jsonify({'success': False, 'error': recommendations})
 
-        # Generate formatted output
+        # Generate formatted output - task 7 most important
         formatted_output = generate_formatted_output(query, summary, recommendations)
 
-        # Return the formatted output in the response
+        # Return the formatted output in the response - task 8
         return jsonify({
             'success': True,
             'formatted_output': formatted_output
@@ -223,6 +208,13 @@ def generate_summary_subprocess():
         # Handle unexpected errors
         print(f"Unexpected error: {e}")  # Log the exception for debugging
         return jsonify({'success': False, 'error': f"Unexpected error: {str(e)}"})
+
+
+
+
+
+
+
 
 
 
