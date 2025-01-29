@@ -1,138 +1,72 @@
 import json
-from flask import Flask, Response, request, jsonify, render_template
-from werkzeug.utils import secure_filename
-import os
-import time
+from flask import Flask, request, jsonify, render_template
 import threading
-import subprocess
+import time
 import logging
-from vectorization import VectorStore, convert_to_serializable, process_file, vectorize_and_search  # Importing your vectorization classes and functions
-from summary import generate_formatted_output, generate_recommendations, generate_summary  # Import the function from summary.py
+from vectorization import VectorStore, convert_to_serializable, vectorize_and_search
+from summary import generate_formatted_output, generate_recommendations, generate_summary
 from file_management import upload_files, delete_file, count_files, get_files  # Import file functions
 
-
 app = Flask(__name__)
-UPLOAD_FOLDER = 'uploads/'
-PERSIST_DIRECTORY = 'data/db'  # Directory for persisting ChromaDB
 
-# Set up upload folder and create it if it doesn't exist
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-# Allowed file extensions for uploads
-ALLOWED_EXTENSIONS = {'pdf', 'xlsx', 'csv', 'docx'}
-
-# Lock for thread safety
-lock = threading.Lock()
-
-# Create an instance of VectorStore to manage vectorization
+# Initialize the vector store
 vector_store = VectorStore()
-
-# Check if the file extension is allowed
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @app.route('/')
 def index():
     return render_template('base.html')
-    return render_template('reportdashboard.html')
-
 
 @app.route('/content/<tab_name>')
 def load_tab_content(tab_name):
-    # Return the HTML content for the requested tab
     try:
         return render_template(f"{tab_name}.html")
     except:
         return "Content not found", 404
 
+# File upload route (delegated to file_management.py)
 @app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-    files = request.files.getlist('file')
-    if len(files) == 0:
-        return jsonify({'error': 'No selected files'}), 400
+def handle_upload():
+    return upload_files(request)
 
-    uploaded_files = []
-    for file in files:
-        if file.filename == '':
-            continue
-        # Check if the file has an allowed extension
-        if not allowed_file(file.filename):
-            return jsonify({'error': 'Invalid file format'}), 400
-
-        # Save the uploaded file temporarily
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(file_path)
-        uploaded_files.append({'filename': filename, 'path': file_path})
-
-    # Vectorize the uploaded files
-    try:
-        for file in uploaded_files:
-            file_path = file['path']
-            file_extension = file['filename'].split('.')[-1].lower()
-            documents = process_file(file_path, file_extension)
-            vector_store.add_documents(documents)
-    except Exception as e:
-        return jsonify({'error': f'Error processing files: {str(e)}'}), 500
-
-    # Return the list of uploaded files for preview
-    return jsonify({'uploaded_files': uploaded_files}), 200
-
+# File deletion route (delegated to file_management.py)
 @app.route('/delete/<filename>', methods=['DELETE'])
-def delete_file(filename):
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    if os.path.exists(file_path):
-        os.remove(file_path)
-        return jsonify({'message': f'File {filename} deleted successfully'})
-    return jsonify({'error': 'File not found'}), 404
+def handle_delete(filename):
+    return delete_file(filename)
 
+# File count route (delegated to file_management.py)
 @app.route('/count_files', methods=['GET'])
-def count_files():
-    try:
-        files = os.listdir(app.config['UPLOAD_FOLDER'])
-        file_list = [file for file in files if os.path.isfile(os.path.join(app.config['UPLOAD_FOLDER'], file))]
-        return jsonify({'file_count': len(file_list)}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+def handle_count_files():
+    return count_files()
 
+# File listing route (delegated to file_management.py)
 @app.route('/get_files', methods=['GET'])
-def get_files():
-    try:
-        files = os.listdir(app.config['UPLOAD_FOLDER'])
-        file_list = [file for file in files if os.path.isfile(os.path.join(app.config['UPLOAD_FOLDER'], file))]
-        return jsonify({'files': file_list}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+def handle_get_files():
+    return get_files()
 
 # Global dictionary to store progress
 progress_data = {"progress": 0, "results": []}
+lock = threading.Lock()
 
 @app.route('/generate_report', methods=['POST'])
 def generate_report():
-    data = request.get_json()  # Get JSON input
+    data = request.get_json()
     if not data or 'query' not in data:
         return jsonify({'error': 'No query provided'}), 400
 
     query = data['query'].strip()
     k = data.get('similarityAmount')
 
-    # Start the analysis in a separate thread to avoid blocking the main thread
     def run_analysis():
         global progress_data
         with lock:
             progress_data['progress'] = 0
-            progress_data['results'] = []  # Reset progress and results
+            progress_data['results'] = []
 
-        # Simulating analysis progress
-        for i in range(0, 50):  # Simulating some progress before vector search
+        for i in range(0, 50):
             with lock:
                 progress_data['progress'] = i
-            time.sleep(0.05)  # Simulate time taken for the analysis
+            time.sleep(0.05)
 
-        # Perform the actual vector search
         try:
             results = vectorize_and_search(query, k)
             with lock:
@@ -153,72 +87,39 @@ def generate_report():
 def get_progress():
     with lock:
         try:
-            # Ensure progress_data is JSON-serializable
-            serializable_data = convert_to_serializable(progress_data)
-            return jsonify(serializable_data)
+            return jsonify(convert_to_serializable(progress_data))
         except Exception as e:
-            # Log the error and return an error response
             logging.error(f"Error in get_progress: {e}")
             return jsonify({"error": "An error occurred"}), 500
-
-
 
 @app.route('/generate_summary', methods=['POST'])
 def generate_summary_subprocess():
     try:
-        # Retrieve data and query from the request - task 1
         data = request.json.get('data', [])
         query = request.json.get('query')
 
-        # Log the received data for debugging
-        print(f"Received data: {data}")
-        print(f"Received query: {query}")
+        if not isinstance(data, list) or not query or not isinstance(query, str):
+            return jsonify({'success': False, 'error': 'Invalid input format or missing query'})
 
-        # Validate input - task 2
-        if not isinstance(data, list):
-            return jsonify({'success': False, 'error': 'Invalid input format, expected a list.'})
-
-        if not query or not isinstance(query, str):
-            return jsonify({'success': False, 'error': 'Query is required and should be a string.'})
-
-        # Generate the summary - task 3
         summary = generate_summary(data, query)
-
-        # Check for errors in summary generation - task 4
         if isinstance(summary, str) and summary.startswith("Error"):
             return jsonify({'success': False, 'error': summary})
 
-        # Generate recommendations based on the summary - task 5
         recommendations = generate_recommendations(summary)
-
-        # Check for errors in recommendations generation - task 6
         if isinstance(recommendations, str) and recommendations.startswith("Error"):
             return jsonify({'success': False, 'error': recommendations})
 
-        # Generate formatted output - task 7 most important
         formatted_output = generate_formatted_output(query, summary, recommendations)
 
-        # Return the formatted output in the response - task 8
         return jsonify({
             'success': True,
             'formatted_output': formatted_output
         })
 
     except Exception as e:
-        # Handle unexpected errors
-        print(f"Unexpected error: {e}")  # Log the exception for debugging
+        logging.error(f"Unexpected error: {e}")
         return jsonify({'success': False, 'error': f"Unexpected error: {str(e)}"})
 
-
-
-
-
-
-
-
-
-
 if __name__ == "__main__":
-    vector_store.initialize_store()  # Re-initialize the store
-
+    vector_store.initialize_store()
     app.run(debug=True)
