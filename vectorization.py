@@ -235,20 +235,30 @@ def convert_to_serializable(obj):
 
 # Utility function to process files
 def process_file(file_path, file_extension):
-    if file_extension == 'pdf':
-        return load_pdf(file_path)
-    elif file_extension == 'xlsx':
-        return load_excel(file_path)
-    elif file_extension == 'csv':
-        return load_csv(file_path)
-    elif file_extension == 'docx':
-        return load_docx(file_path)
-    else:
-        raise ValueError("Unsupported file type")
+    try:
+        if file_extension == 'pdf':
+            return load_pdf(file_path)
+        elif file_extension == 'xlsx':
+            return load_excel(file_path)
+        elif file_extension == 'csv':
+            return load_csv(file_path)
+        elif file_extension == 'docx':
+            return load_docx(file_path)
+        else:
+            raise ValueError("Unsupported file type")
+    except Exception as e:
+        logging.error(f"Error processing file {file_path}: {str(e)}")
+        return []
 
 # Singleton instance for use across the Flask application
 vector_store = VectorStore()
 
 def vectorize_and_search(query, k):
     # Perform similarity search using the singleton vector_store instance
-    return vector_store.similarity_search(query, k)
+    try:
+        results = vector_store.similarity_search(query, k)
+    except Exception as e:
+        logging.error(f"Error during vectorization or search: {str(e)}")
+        return []
+    return results
+

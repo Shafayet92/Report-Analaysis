@@ -8,6 +8,7 @@ import subprocess
 import logging
 from vectorization import VectorStore, convert_to_serializable, process_file, vectorize_and_search  # Importing your vectorization classes and functions
 from summary import generate_formatted_output, generate_recommendations, generate_summary  # Import the function from summary.py
+from file_management import upload_files, delete_file, count_files, get_files  # Import file functions
 
 
 app = Flask(__name__)
@@ -35,7 +36,6 @@ def allowed_file(filename):
 def index():
     return render_template('base.html')
     return render_template('reportdashboard.html')
-
 
 
 @app.route('/content/<tab_name>')
