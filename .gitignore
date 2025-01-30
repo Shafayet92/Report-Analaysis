@@ -73,3 +73,5 @@ db.sqlite3
 .DS_Store
 
 doct.docx
+#chroma db
+data/db/chroma.*
