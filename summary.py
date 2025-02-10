@@ -1,305 +1,238 @@
-import sys
-import json
+import logging
 import ollama
-def generate_summary(input_data, command):
-    """
-    Generate a summary using the local Ollama Llama3.2 model.
-    """
-    if not isinstance(input_data, list) or not all('result' in item and 'relevance' in item for item in input_data):
-        return "Invalid input: Each item must be a dictionary with 'result' and 'relevance' keys."
+from flask import Flask, request, jsonify
+from typing import Optional
 
-    # Sort data by relevance and combine the text
-    sorted_data = sorted(input_data, key=lambda x: x['relevance'], reverse=True)
-    combined_text = "\n".join([item['result'] for item in sorted_data])
 
-    # Improved, more specific prompt to guide the model
-    prompt = f"""
-        You are an expert summarizer tasked with creating a concise and direct summary based on the following content.
-        The information is sorted by relevance, with the most important points appearing first.
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
-        Your job is to:
-        1. Summarize the content by extracting the core message without analyzing each individual entry.
-        2. Provide a high-level overview, focusing only on the most relevant and important points.
-        3. Avoid unnecessary explanations or phrases like "It appears" or "This content" or "Here are the summaries:".
-        4. Keep the summary clear, direct, and to the point without recommendations or actions unless absolutely essential.
-        5. Understand it properly then make the answer.
+def call_ollama(agent_role: str, prompt: str, model: str = "llama3.2") -> Optional[str]:
+    """ Call the local Ollama model to generate a response. """
+    try:
+        response = ollama.chat(
+            model=model,
+            messages=[
+                {"role": "system", "content": f"You are a helpful assistant specializing in {agent_role}."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return response['message']['content'].strip()
 
-        Note: This combine text data is a search vector data, search based on the command to make your task more related and efficient, so always understand them.
+    except Exception as e:
+        logging.error(f"Error calling Ollama for role '{agent_role}': {e}", exc_info=True)
+        return None
 
-        command: "{command}"?
+def call_deepseek_r1(prompt: str) -> Optional[str]:
+    """ Use DeepSeek-R1 for query refinement and step optimization. """
+    try:
+        response = ollama.chat(
+            model="deepseek-r1",
+            messages=[
+                {"role": "system", "content": "You are an advanced prompt optimizer that improves task clarity and step efficiency."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return response['message']['content'].strip()
 
-        Text to summarize:
-        "{combined_text}"
+    except Exception as e:
+        logging.error(f"Error calling DeepSeek-R1 for prompt optimization: {e}", exc_info=True)
+        return None
+
+def prompt_optimizer(user_query: str, context) -> Optional[str]:
+    """ Optimizes user instructions using DeepSeek-R1. """
+    prompt = (
+        f"""Optimize the following user instruction or user_query based on the given or Provided Context. Improve clarity, structure, and step efficiency to ensure precise AI-generated reports.
+
+        - **Refine vague or broad queries** into well-defined, structured instructions.
+        - **Incorporate relevant context** into the query to make it more specific.
+        - **Break down complex requests** into a sequence of clear steps.
+        - **Ensure the instruction aligns with industry standards** for structured reporting.
+        - **Remove unnecessary words or ambiguity** to improve efficiency.
+
+        ### User Instruction:
+        {user_query}
+
+        ### Provided Context:
+        {context}
+
+        Return the optimized instruction for prompt in a **concise ollama model** format that ensures the best possible response.
+        """
+    )
+    return call_deepseek_r1(prompt)
+
+def retrieval_agent(optimized_instruction: str, context) -> Optional[str]:
+    """ Retrieves relevant content. """
+    prompt = (
+        f"""Find the most relevant and detailed data for the following request. Extract full information, including statistics, incident records, expert opinions, and any supporting evidence.
+
+        Ensure the response includes:
+        - Historical background and trends.
+        - Relevant technical details.
+        - Risk assessments and real-world implications.
+        - Regulations and compliance considerations.
+
+        Format the response as detailed paragraphs at the end.
+         ### Optimized Instruction:
+            {optimized_instruction}
+
+        ### Context:
+            {context}
+
         """
 
+    )
+    return call_ollama("Retrieval Agent", prompt)
 
-    try:
-        # Use Ollama to generate the summary
-        response = ollama.chat(
-            model="llama3.2",
-            messages=[{
-                "role": "system",
-                "content": "You are a helpful assistant that generates concise, informative summaries."
-            },{
-                "role": "user",
-                "content": prompt
-            }]
-        )
+def filtering_agent(retrieved_context: str) -> Optional[str]:
+    """ Filters out irrelevant, redundant, or low-quality information. """
+    prompt = (
+        f"""
+        Refine the extracted data by removing irrelevant, redundant, or overly generic information.
 
-        # Extract and return the summary
-        return response['message']['content']
+        Keep:
+        - Specific technical details.
+        - Data-driven insights.
+        - Real-world incidents or case studies.
+        - Actionable recommendations.
 
-    except Exception as e:
-        return f"Error generating summary: {str(e)}"
+        Ensure the response remains well-structured and improves clarity while maintaining depth.
 
-def generate_recommendations(summary):
+
+        "{retrieved_context}"""
+    )
+    return call_ollama("Filtering Agent", prompt)
+
+def analysis_agent(filtered_context: str) -> Optional[str]:
+    """ Extracts structured key points. """
+    prompt = (
+        f"""Analyze the following data and extract the key findings in a **detailed and structured** manner.
+
+        For each key issue:
+        - Provide a full explanation with causes and implications.
+        - Discuss any historical or statistical relevance.
+        - Highlight industry regulations and best practices.
+
+        Use full paragraphs instead of just bullet points to ensure a **comprehensive analysis**.
+
+        "{filtered_context}"""
+    )
+    return call_ollama("Analysis Agent", prompt)
+
+def contextualization_agent(key_points: str) -> Optional[str]:
+    """ Enhances key points with missing insights or explanations. """
+    prompt = (
+        f"""Expand on the key points below by **adding missing insights, real-world examples, historical context, and regulatory considerations**.
+
+        For each key point:
+        - **Explain the background**: Why is this issue important? Has it been a problem in the past?
+        - **Provide industry-specific regulations**: Are there any laws, safety standards, or compliance requirements related to this?
+        - **Identify potential risks**: What happens if this issue is ignored? What are the short-term and long-term consequences?
+        - **Incorporate real-world case studies**: Reference past incidents or industry best practices.
+        - **Explore future implications**: How might this issue evolve? Are there emerging technologies or solutions to address it?
+
+        Ensure the response has **clear logical flow**, maintains a **formal and professional tone**, and avoids redundant explanations.
+
+        "{key_points}"""
+    )
+    return call_ollama("Contextualization Agent", prompt)
+
+def summarization_agent(enhanced_key_points: str) -> Optional[str]:
+    """ Generates a structured business report in Markdown format. """
+    prompt = (
+        f"""Using the detailed key points and formal writing, generate a **comprehensive business report**.
+
+        The report should contain:
+        - **Introduction**: A well-written overview explaining the background and significance of the issue.
+        - **Key Findings**: A structured analysis of major risks and their implications.
+        - **Corrective Actions**: A well-organized list of immediate steps to mitigate risks.
+        - **Ongoing Monitoring & Compliance**: Long-term strategies for maintaining safety and operational standards.
+        - **Training & Awareness**: The role of crew education and drills in preventing failures.
+        - **Recommendations**: Clear, actionable solutions with explanations.
+
+        Use full paragraphs, **formal business tone**, and make sure the report is engaging, well-reasoned, and **not too short**.
+        Note: Avoid phrases like "It appears" or "This content" or "Here are the summaries:" or "Comprehensive Business Report".
+
+        "{enhanced_key_points}"""
+    )
+    return call_ollama("Summarization Agent", prompt)
+
+def refinement_agent(summary_report: str) -> Optional[str]:
+    """ Refines the final report for clarity, readability, and proper formatting. """
+    prompt = (
+        f"""Refine the following report to ensure **clarity, logical flow, and strong formatting of Markdown**.
+
+        - Expand on technical explanations where needed.
+        - Improve transitions between sections.
+        - Ensure **a smooth narrative flow** instead of isolated bullet points.
+        - Format properly with headings and well-structured paragraphs.
+        - Make output as Markdown formatted.
+        - Use only 3rd person formate or formal format to make the report
+        - Avoid phrases like "It appears" or "This content" or "Here are the summaries:" or "Comprehensive Business Report".
+
+        The final result should read like a **professionally prepared industry report** in Markdown format.
+
+        Report:
+        "{summary_report}"""
+    )
+    return call_ollama("Refinement Agent", prompt)
+
+def multi_agent_pipeline(user_instruction: str, context) -> Optional[str]:
     """
-    Generate actionable recommendations using the local Ollama Llama3.2 model.
+    Multi-agent pipeline that:
+      1. Optimizes the user query (DeepSeek-R1).
+      2. Retrieves relevant content.
+      3. Filters unnecessary data.
+      4. Extracts structured key points.
+      5. Adds missing insights.
+      6. Summarizes into a business report.
+      7. Refines the final output.
+
+    Returns:
+         The final must be report Markdown formatted.
     """
-    prompt = f"""
-        Based on the following summary:
-        "{summary}"
+    # Step 1: Optimize query using DeepSeek-R1
+    optimized_instruction = prompt_optimizer(user_instruction, context)
+    if not optimized_instruction:
+        logging.error("Prompt optimization failed.")
+        return None
 
-        You are an expert at providing actionable workplace safety recommendations. Your task is to:
-        1. Identify areas for improvement based on the content.
-        2. Provide specific, actionable recommendations in three categories:
-            - Policies to implement.
-            - Corrective actions to address current issues.
-            - Preventive measures to avoid future problems.
-        3. Structure your response as:
-            - Policies:
-            - Corrective Actions:
-            - Preventive Measures:
+    # Step 2: Retrieve content
+    retrieved_context = retrieval_agent(optimized_instruction, context)
+    if not retrieved_context:
+        logging.error("Retrieval agent failed.")
+        return None
 
-        Keep the language clear and professional.
-    """
+    # Step 3: Filter out irrelevant data
+    filtered_context = filtering_agent(retrieved_context)
+    if not filtered_context:
+        logging.error("Filtering agent failed.")
+        return None
 
-    try:
-        # Use Ollama to generate recommendations
-        response = ollama.chat(
-            model="llama3.2",
-            messages=[{
-                "role": "system",
-                "content": "You are a helpful assistant that generates actionable workplace recommendations."
-            }, {
-                "role": "user",
-                "content": prompt
-            }]
-        )
+    # Step 4: Extract key insights
+    key_points = analysis_agent(filtered_context)
+    if not key_points:
+        logging.error("Analysis agent failed.")
+        return None
 
-        # Extract and return the recommendations
-        return response['message']['content']
+    # Step 5: Add missing insights
+    enhanced_key_points = contextualization_agent(key_points)
+    if not enhanced_key_points:
+        logging.error("Contextualization agent failed.")
+        return None
 
-    except Exception as e:
-        return f"Error generating recommendations: {str(e)}"
+    # Step 6: Generate structured Markdown report
+    summary_report = summarization_agent(enhanced_key_points)
+    if not summary_report:
+        logging.error("Summarization agent failed.")
+        return None
 
+    # Step 7: Final refinement
+    final_report = refinement_agent(summary_report)
+    if not final_report:
+        logging.error("Refinement agent failed.")
+        return None
 
-def generate_anomalies(input_data):
-    """
-    Detect anomalies in safety incident data using the local Ollama Llama3.2 model.
-    """
-    if not isinstance(input_data, list) or not all('incident_type' in item and 'severity' in item for item in input_data):
-        return "Invalid input: Each item must be a dictionary with 'incident_type' and 'severity' keys."
-
-    # Combine data for analysis
-    combined_data = "\n".join([f"Incident: {item['incident_type']}, Severity: {item['severity']}" for item in input_data])
-
-    # Prompt to guide the model in anomaly detection
-    prompt = f"""
-        You are an expert in safety data analysis. Your task is to detect any anomalies in the following incident data.
-
-        The data includes safety incidents with varying levels of severity. You need to:
-        1. Analyze the data and categorize anomalies into the following groups:
-            - Critical Anomalies: Incidents that require immediate attention due to high severity or unusual occurrences.
-            - Potential Anomalies: Incidents that may need further investigation or monitoring.
-            - Normal: Regular incidents that do not indicate any immediate risks or unusual patterns.
-        2. For each category, provide a brief explanation of why the incident is classified as such.
-
-        Here is the incident data to analyze:
-        "{combined_data}"
-        """
-
-    try:
-        # Use Ollama to generate anomaly detection results
-        response = ollama.chat(
-            model="llama3.2",
-            messages=[{
-                "role": "system",
-                "content": "You are a safety expert who detects and categorizes anomalies in safety data."
-            }, {
-                "role": "user",
-                "content": prompt
-            }]
-        )
-
-        # Extract and return the anomalies detection result
-        return response['message']['content']
-
-    except Exception as e:
-        return f"Error detecting anomalies: {str(e)}"
-
-
-
-
-
-# def generate_formatted_output(command, summary, recommendations):
-#     """
-#     Generate a formatted HTML output using the summary and recommendations.
-#     """
-#     prompt = f"""
-#     Based on the following summary and recommendations, generate a clean and structured HTML output:
-
-#     command:
-#     {command}
-
-#     Summary:
-#     {summary}
-
-
-#     Recommendations:
-#     {recommendations}
-
-#     Your task is to:
-#     1. Create an HTML structure with:
-#         - A <h3> heading for the summary.
-#         - A <h4> heading for the recommendations.
-#         - An ordered list (<ol>) for policies, corrective actions, and preventive measures.
-#     2. Structure the output in the following order:
-#         - A summary section with a heading.
-#         - A recommendations section with three subsections:
-#             - Policies
-#             - Corrective Actions
-#             - Preventive Measures
-#     3. Ensure the HTML output is clean and professional, suitable for display on a website.
-#     4. Do not write any other words except this formate.
-
-
-#     Your output should look like this:
-
-#     <h3 style="margin-top: 20px;">command:</h3>
-#     <p>The content of the command goes here.</p>
-
-#     <h3 style="margin-top: 20px;">Summary:</h3>
-#     <p>The content of the summary goes here.</p>
-
-#     <h3 style="margin-top: 20px;">Recommendations:</h3>
-
-#     <h4 style="margin-top: 20px;">Policy:</h4>
-#     <ol style="margin-left: 20px; padding-left: 20px;">
-#         <li>Policy 1</li>
-#         <li>Policy 2</li>
-#     </ol>
-
-#     <h4 style="margin-top: 20px;">Corrective Actions:</h4>
-#     <ol style="margin-left: 20px; padding-left: 20px;">
-#         <li>Action 1</li>
-#         <li>Action 2</li>
-#     </ol>
-
-#     <h4 style="margin-top: 20px;">Preventive Measures:</h4>
-#     <ol style="margin-left: 20px; padding-left: 20px;">
-#         <li>Measure 1</li>
-#         <li>Measure 2</li>
-#     </ol>
-
-
-#     """
-
-#     try:
-#         # Use Ollama to generate formatted HTML output
-#         response = ollama.chat(
-#             model="llama3.2",
-#             messages=[{
-#                 "role": "system",
-#                 "content": "You are an assistant that generates structured HTML output."
-#             }, {
-#                 "role": "user",
-#                 "content": prompt
-#             }]
-#         )
-
-#         # Return the generated HTML
-#         return response['message']['content']
-
-#     except Exception as e:
-#         return f"Error generating formatted output: {str(e)}"
-
-
-def generate_formatted_output(command, summary, recommendations):
-    """
-    Generate a formatted Markdown output using the summary and recommendations.
-    """
-    prompt = f"""
-    Based on the following summary and recommendations, generate a clean and structured Markdown output:
-
-    command:
-    {command}
-
-    Summary:
-    {summary}
-
-
-    Recommendations:
-    {recommendations}
-
-    Your task is to:
-    1. Create a Markdown structure with:
-        - A top-level heading (#) for the command.
-        - A second-level heading (##) for the summary.
-        - A second-level heading (##) for the recommendations.
-        - Subsections (###) for Policies, Corrective Actions, and Preventive Measures.
-        - Use unordered lists (-) for each subsection.
-    2. Structure the output in the following order:
-        - A command section with a heading.
-        - A summary section with a heading.
-        - A recommendations section with three subsections:
-            - Policies
-            - Corrective Actions
-            - Preventive Measures
-    3. Ensure the Markdown output is clean and professional, suitable for display on a Markdown-supported platform.
-    4. Do not include any additional text except the required Markdown structure.
-
-    Your output should look like this:
-
-    ## command: \n
-    The content of the command goes here.
-
-    ## Summary: \n
-    The content of the summary goes here.
-
-    ## Recommendations: \n
-
-    ### Policies:
-    - Policy 1
-    - Policy 2
-
-    ### Corrective Actions:
-    - Action 1
-    - Action 2
-
-    ### Preventive Measures:
-    - Measure 1
-    - Measure 2
-    """
-
-    try:
-        # Use Ollama to generate formatted Markdown output
-        response = ollama.chat(
-            model="llama3.2",
-            messages=[{
-                "role": "system",
-                "content": "You are an assistant that generates structured Markdown output."
-            }, {
-                "role": "user",
-                "content": prompt
-            }]
-        )
-
-        # Return the generated Markdown
-        return response['message']['content']
-
-    except Exception as e:
-        return f"Error generating formatted output: {str(e)}"
-
+    return final_report
 
 

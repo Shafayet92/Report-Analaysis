@@ -331,31 +331,6 @@ button {
   color: #6b7280; /* Gray text color for progress */
 }
 
-/* Table Styling */
-#similarityTable {
-  width: 100%;
-  border-collapse: collapse;
-  border: 1px solid #d1d5db; /* Light gray border */
-  background-color: white;
-}
-
-#similarityTable th,
-#similarityTable td {
-  text-align: left;
-  padding: 0.75rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-#similarityTable th {
-  background-color: #f3f4f6;
-  font-weight: 600;
-  color: #374151;
-}
-
-#similarityTable tr:hover {
-  background-color: #f9fafb; /* Light hover effect */
-}
-
 /* Summary Button */
 #summaryButtonContainer {
   margin-top: 20px;

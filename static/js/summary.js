@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const progressText = document.getElementById("loaderText");
     const loaderWrapper = document.querySelector(".loader-wrapper"); // Added reference to the loader wrapper
 
+
     // References to the tabs
     const tabs = {
         query: document.querySelector('.tab-content1'),
@@ -66,7 +67,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // Wait for the backend task (summary generation) to complete
         await new Promise((resolve) => {
-            setTimeout(resolve, 5000); // Simulate waiting for the backend to finish (can be replaced by actual request completion)
+            setTimeout(resolve, 50000); // Simulate waiting for the backend to finish (can be replaced by actual request completion)
         });
 
         // Stop the progress bar when the task is completed
@@ -93,28 +94,28 @@ document.addEventListener("DOMContentLoaded", function () {
         progressBar.style.width = '0%';
         progressText.textContent = '0% Analysis';
 
-        // Retrieve table data using DataTables API
-        const tableData = $("#similarityTable")
-            .DataTable()
-            .rows()
-            .data()
-            .toArray();
 
-        // Log the tableData to check its structure
-        console.log("Table Data:", tableData);
+        // Get all clickable rows and their corresponding full-text rows
+        const tableRows = document.querySelectorAll('#similarityTable tbody tr.clickable-row');
 
-        // Validate table data structure
-        if (!Array.isArray(tableData) || tableData.length === 0) {
-            summaryContainer.innerHTML = "<p>No data available in the table to process.</p>";
-            return;
-        }
+        // Process each row and extract full text, file_name, and relevance
+        const formattedData = Array.from(tableRows).map((row, index) => {
+            const shortText = row.querySelector('.short-text')?.textContent.trim() || '';
+            const fileName = row.cells[2]?.textContent.trim() || 'N/A';
+            const relevance = parseFloat(row.cells[3]?.textContent) || 0;
 
-        // Format table data as needed for the backend
-        const formattedData = tableData.map(row => ({
-            index: row[0],
-            result: row[1],
-            relevance: row[2]
-        }));
+            // Find the corresponding extra-row that contains full text
+            const extraRow = row.nextElementSibling; // The next row should be the full-text row
+            const fullText = extraRow?.classList.contains('extra-row')
+                ? extraRow.querySelector('.full-text')?.textContent.trim()
+                : shortText; // Fallback to shortText if full text is not found
+
+            return {
+                result: fullText, // Send full text instead of short text
+                file_name: fileName, // Include file name
+                relevance: relevance // Include relevance score
+            };
+        });
 
         // Log the formatted data for debugging
         console.log("Formatted Data:", formattedData);
@@ -126,7 +127,7 @@ document.addEventListener("DOMContentLoaded", function () {
             // Payload for the POST request
             const payload = {
                 data: formattedData, // Send the vectorized data (table data) to the backend
-                query: query,
+                query: query, // Include the query
             };
 
             // Send a POST request to generate the summary
@@ -155,6 +156,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 // Display the parsed HTML content inside the summaryContainer
                 summaryContainer.innerHTML = htmlContent;
+
             } else {
                 summaryContainer.innerHTML = `<p>Error: ${data.error}</p>`;
             }
@@ -163,7 +165,6 @@ document.addEventListener("DOMContentLoaded", function () {
             summaryContainer.innerHTML = "<p>Error generating summary. Please try again later.</p>";
             loaderWrapper.style.display = "none"; // Ensure loader is hidden in case of errors
         }
-
     });
 
 });

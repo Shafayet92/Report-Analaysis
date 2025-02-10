@@ -46,7 +46,6 @@ function exportToPDF(content) {
 
 
 
-
 // Function to export the report to DOCX
 function exportToDOCX(content) {
     try {
@@ -96,7 +95,7 @@ function printReport(content) {
     printWindow.document.write(`
         <html>
             <head>
-                <title>Print Report</title>
+                <title>Report Generator</title>
                 <style>
                     body {
                         font-family: Arial, sans-serif;

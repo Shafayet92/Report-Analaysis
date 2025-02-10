@@ -3,11 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Report Dashboard</title>
+    <title>Report Generator</title>
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='css/reportdashboard.css') }}"
     />
+    <link
+      rel="icon"
+      type="image/png"
+      href="{{ url_for('static', filename='img/applogo.png') }}"
+    />
+
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='css/report.css') }}"
@@ -16,6 +22,11 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='css/anim.css') }}"
     />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/similarityTable.css') }}"
+    />
+
     <link
       rel="stylesheet"
       href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css"
@@ -45,6 +56,14 @@
     <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.12/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <!-- Include jsPDF (and its html plugin) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- Include docx -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/7.6.0/docx.umd.js"></script>
   </head>
   <body>
     <div id="alert" class="alert alert-success" style="display: none">
@@ -144,15 +163,12 @@
             </div>
 
             <div id="resultsContainer" style="margin-top: 20px">
-              <table
-                id="similarityTable"
-                class="table table-bordered table-hover dt-responsive nowrap"
-                style="width: 100%"
-              >
+              <table id="similarityTable">
                 <thead>
                   <tr>
                     <th>No</th>
                     <th>Result</th>
+                    <th>File Name</th>
                     <th>Relevance</th>
                   </tr>
                 </thead>

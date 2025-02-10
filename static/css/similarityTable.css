@@ -1,0 +1,48 @@
+/* Your CSS for the table */
+#similarityTable {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #d1d5db;
+  background-color: white;
+}
+#similarityTable th,
+#similarityTable td {
+  text-align: left;
+  padding: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+#similarityTable th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer; /* Add a pointer cursor to indicate clickable columns */
+}
+
+#similarityTable th.sorting_asc::after {
+  content: " ↑"; /* Ascending arrow */
+}
+
+#similarityTable th.sorting_desc::after {
+  content: " ↓"; /* Descending arrow */
+}
+
+.extra-row {
+  display: none;
+  background-color: #f9f9f9;
+}
+.clickable-row {
+  cursor: pointer;
+}
+.clickable-row:hover {
+  background-color: #f3f4f6;
+}
+.full-text {
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+/* Ensure the File Name column has a minimum width */
+#similarityTable th:nth-child(3) {
+  min-width: 200px; /* Adjust this value to the desired minimum width */
+  text-align: left; /* Align text to the left */
+}

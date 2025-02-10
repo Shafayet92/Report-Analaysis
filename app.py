@@ -4,7 +4,7 @@ import threading
 import time
 import logging
 from vectorization import VectorStore, convert_to_serializable, vectorize_and_search
-from summary import generate_formatted_output, generate_recommendations, generate_summary
+from summary import multi_agent_pipeline
 from file_management import upload_files, delete_file, count_files, get_files  # Import file functions
 
 app = Flask(__name__)
@@ -43,12 +43,14 @@ def handle_count_files():
 def handle_get_files():
     return get_files()
 
+
+
 # Global dictionary to store progress
 progress_data = {"progress": 0, "results": []}
 lock = threading.Lock()
 
-@app.route('/generate_report', methods=['POST'])
-def generate_report():
+@app.route('/start_analysis', methods=['POST'])
+def start_analysis():
     data = request.get_json()
     if not data or 'query' not in data:
         return jsonify({'error': 'No query provided'}), 400
@@ -62,23 +64,26 @@ def generate_report():
             progress_data['progress'] = 0
             progress_data['results'] = []
 
-        for i in range(0, 50):
-            with lock:
-                progress_data['progress'] = i
-            time.sleep(0.05)
-
         try:
             results = vectorize_and_search(query, k)
             with lock:
                 progress_data['results'] = [
-                    {"result": doc.page_content, "relevance": score}
+                    {
+                        "result": doc.page_content,
+                        "relevance": round(score, 4),
+                        "file_name": doc.metadata.get("file_name", "Unknown")  # Ensuring file_name is included
+                    }
                     for doc, score in results
                 ]
                 progress_data['progress'] = 100
+
         except Exception as e:
             with lock:
                 progress_data['progress'] = 100
-                progress_data['results'] = [{"result": f"Error during analysis: {str(e)}", "relevance": 0}]
+                progress_data['results'] = [
+                    {"result": f"Error during analysis: {str(e)}", "relevance": 0, "file_name": "N/A"}
+                ]
+
 
     threading.Thread(target=run_analysis).start()
     return jsonify({"message": "Analysis started"}), 202
@@ -101,16 +106,19 @@ def generate_summary_subprocess():
         if not isinstance(data, list) or not query or not isinstance(query, str):
             return jsonify({'success': False, 'error': 'Invalid input format or missing query'})
 
-        summary = generate_summary(data, query)
-        if isinstance(summary, str) and summary.startswith("Error"):
-            return jsonify({'success': False, 'error': summary})
 
-        recommendations = generate_recommendations(summary)
-        if isinstance(recommendations, str) and recommendations.startswith("Error"):
-            return jsonify({'success': False, 'error': recommendations})
+         # Sort the input data by relevance (highest first)
+        sorted_data = sorted(data, key=lambda x: x['relevance'], reverse=True)
 
-        formatted_output = generate_formatted_output(query, summary, recommendations)
+        # Combine the results from each item, preserving the order
+        context = " ".join(
+            [item['result'] for item in sorted_data]
+        )
 
+        # Execute the multi-agent pipeline to generate the report.
+        formatted_output = multi_agent_pipeline(query, context)
+        if not formatted_output:
+            return jsonify({'success': False, 'error': 'Failed to generate summary'})
         return jsonify({
             'success': True,
             'formatted_output': formatted_output
@@ -119,6 +127,8 @@ def generate_summary_subprocess():
     except Exception as e:
         logging.error(f"Unexpected error: {e}")
         return jsonify({'success': False, 'error': f"Unexpected error: {str(e)}"})
+
+
 
 if __name__ == "__main__":
     vector_store.initialize_store()

@@ -1,3 +1,4 @@
+import logging
 import os
 from flask import jsonify
 from werkzeug.utils import secure_filename
@@ -48,11 +49,21 @@ def upload_files(request):
 
 def delete_file(filename):
     """Delete a specific file from the uploads folder."""
+    # First, delete the file from the uploads folder
     file_path = os.path.join(UPLOAD_FOLDER, filename)
     if os.path.exists(file_path):
         os.remove(file_path)
-        return jsonify({'message': f'File {filename} deleted successfully'})
-    return jsonify({'error': 'File not found'}), 404
+        file_deletion_response = jsonify({'message': f'File {filename} deleted successfully'})
+    else:
+        return jsonify({'error': 'File not found'}), 404
+
+    # Then, delete the associated chunks from the Chroma vector store
+    deletion_success = vector_store.delete_chunks_by_file(filename)
+    if not deletion_success:
+        # Optionally, you can decide how to handle an error here
+        logging.error(f"Failed to delete chunks for file '{filename}' from the vector store.")
+
+    return file_deletion_response
 
 def count_files():
     """Return the count of files in the uploads folder."""
