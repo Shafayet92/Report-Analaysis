@@ -23,26 +23,26 @@ def call_ollama(agent_role: str, prompt: str, model: str = "llama3.2") -> Option
         logging.error(f"Error calling Ollama for role '{agent_role}': {e}", exc_info=True)
         return None
 
-def call_deepseek_r1(prompt: str) -> Optional[str]:
-    """ Use DeepSeek-R1 for query refinement and step optimization. """
+def prompt_optimizer_agent(prompt: str) -> Optional[str]:
+    """ Use llama3.2 for query refinement and step optimization. """
     try:
         response = ollama.chat(
-            model="deepseek-r1",
+            model="llama3.2",
             messages=[
-                {"role": "system", "content": "You are an advanced prompt optimizer that improves task clarity and step efficiency."},
+                {"role": "system", "content": "You are an advanced prompt optimizer that improves task clarity and step efficiency based on specially on User Instruction"},
                 {"role": "user", "content": prompt}
             ]
         )
         return response['message']['content'].strip()
 
     except Exception as e:
-        logging.error(f"Error calling DeepSeek-R1 for prompt optimization: {e}", exc_info=True)
+        logging.error(f"Error calling llama3.2 for prompt optimization: {e}", exc_info=True)
         return None
 
 def prompt_optimizer(user_query: str, context) -> Optional[str]:
-    """ Optimizes user instructions using DeepSeek-R1. """
+    """ Optimizes user instructions using llama3.2. """
     prompt = (
-        f"""Optimize the following user instruction or user_query based on the given or Provided Context. Improve clarity, structure, and step efficiency to ensure precise AI-generated reports.
+        f"""Optimize the following user instruction or user_query based on the given or Provided Context. Improve prompt clarity, structure, and step efficiency to ensure precise AI-generated reports prompt.
 
         - **Refine vague or broad queries** into well-defined, structured instructions.
         - **Incorporate relevant context** into the query to make it more specific.
@@ -59,7 +59,7 @@ def prompt_optimizer(user_query: str, context) -> Optional[str]:
         Return the optimized instruction for prompt in a **concise ollama model** format that ensures the best possible response.
         """
     )
-    return call_deepseek_r1(prompt)
+    return prompt_optimizer_agent(prompt)
 
 def retrieval_agent(optimized_instruction: str, context) -> Optional[str]:
     """ Retrieves relevant content. """
@@ -180,7 +180,7 @@ def refinement_agent(summary_report: str) -> Optional[str]:
 def multi_agent_pipeline(user_instruction: str, context) -> Optional[str]:
     """
     Multi-agent pipeline that:
-      1. Optimizes the user query (DeepSeek-R1).
+      1. Optimizes the user query (llama3.2).
       2. Retrieves relevant content.
       3. Filters unnecessary data.
       4. Extracts structured key points.
@@ -191,7 +191,7 @@ def multi_agent_pipeline(user_instruction: str, context) -> Optional[str]:
     Returns:
          The final must be report Markdown formatted.
     """
-    # Step 1: Optimize query using DeepSeek-R1
+    # Step 1: Optimize query using llama3.2
     optimized_instruction = prompt_optimizer(user_instruction, context)
     if not optimized_instruction:
         logging.error("Prompt optimization failed.")
