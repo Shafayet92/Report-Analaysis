@@ -55,6 +55,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
+
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.12/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -162,21 +163,7 @@
               <p id="progressText" style="display: none">0% Analysis</p>
             </div>
 
-            <div id="resultsContainer" style="margin-top: 20px">
-              <table id="similarityTable">
-                <thead>
-                  <tr>
-                    <th>No</th>
-                    <th>Result</th>
-                    <th>File Name</th>
-                    <th>Relevance</th>
-                  </tr>
-                </thead>
-                <tbody id="resultsTableBody">
-                  <!-- Dynamic rows will be appended here -->
-                </tbody>
-              </table>
-            </div>
+            <div id="resultsContainer" style="margin-top: 20px"></div>
             <div class="form-group" id="summaryButtonContainer">
               <button type="button" class="btn btn-primary" id="summaryButton">
                 Generate Report
