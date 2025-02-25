@@ -1,12 +1,14 @@
 document.addEventListener('DOMContentLoaded', function () {
     // DOM Elements
     const generateButton = document.getElementById('generateButton');
-    const similarityAmountInput = document.getElementById('similarity-amount');
     const progressBarContainer = document.getElementById('progressBarContainer');
     const progressBar = document.getElementById('progressBar');
     const progressText = document.getElementById('progressText');
     const resultsContainer = document.getElementById('resultsContainer');
     const queryText = document.getElementById('queryInput');
+
+
+
 
     // Tab References
     const tabs = {
@@ -39,13 +41,13 @@ document.addEventListener('DOMContentLoaded', function () {
     // Event listener for Generate Button
     generateButton.addEventListener('click', () => {
         const query = queryText.value.trim();
-        const similarityAmount = similarityAmountInput.value.trim();
+
+        const useLLM = document.getElementById('mode-toggle').checked; // true: Chroma + LLM Mode, false: Pure Chroma Mode
+
+        const kvalue = parseInt(document.getElementById('similarity-amount').value, 10) || 0;
+
 
         // Validate inputs
-        if (!similarityAmount || similarityAmount <= 0) {
-            alert('Please enter a valid similarity data amount.');
-            return;
-        }
         if (!query) {
             alert('Please enter a query to generate the report.');
             return;
@@ -64,7 +66,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch('/start_analysis', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query, similarityAmount: parseInt(similarityAmount) }),
+            body: JSON.stringify({ query, useLLM, kvalue }),
         })
             .then((response) => response.json())
             .then((data) => {
@@ -90,7 +92,20 @@ document.addEventListener('DOMContentLoaded', function () {
                     // When progress reaches 100%
                     if (progress === 100) {
                         clearInterval(interval);
-                        displayResultsPerFile(data.results);
+
+                        // Display summaries using the new function
+                        if (data.full_summary || data.file_summaries.length > 0) {
+                            displaySummaries(data.full_summary, data.file_summaries, data.results, data.file_names);
+                        } else {
+                            console.warn("No summaries available");
+                        }
+
+                        // Display detailed results as before
+                        if (data.results && data.results.length > 0) {
+                            displayResultsPerFile(data.results);
+                        } else {
+                            console.warn("No results available");
+                        }
                     }
                 })
                 .catch((error) => {
@@ -100,212 +115,119 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 500); // Check progress every 500ms
     }
 
-    function displayResultsPerFile(results) {
+    function displaySummaries(fullSummary, fileSummaries, results, file_names) {
         const resultsContainer = document.getElementById('resultsContainer');
-        resultsContainer.innerHTML = ''; // Clear any previous content
+        if (!resultsContainer) {
+            console.error("resultsContainer element not found in the DOM.");
+            return;
+        }
 
-        // Group results by file name.
-        const groupedResults = results.reduce((acc, item) => {
-            const fileName = item.file_name || 'Unknown';
-            if (!acc[fileName]) {
-                acc[fileName] = [];
-            }
-            acc[fileName].push(item);
-            return acc;
-        }, {});
+        resultsContainer.innerHTML = ''; // Clear previous content
 
-        // Loop over each group to create an independent table.
-        Object.keys(groupedResults).forEach((fileName, fileIndex) => {
-            // Create a section container for each file's table.
-            const sectionDiv = document.createElement('div');
-            sectionDiv.className = 'file-section';
-            sectionDiv.style.marginBottom = '20px'; // Add spacing between sections
+        if (fullSummary && fullSummary.length > 0) {
+            // Full Summary Section
+            const fullSummaryHeader = document.createElement('h2');
+            fullSummaryHeader.textContent = 'Full Summary';
+            resultsContainer.appendChild(fullSummaryHeader);
 
+            const fullSummaryPara = document.createElement('p');
+            fullSummaryPara.textContent = fullSummary || "No full summary available.";
+            resultsContainer.appendChild(fullSummaryPara);
+        }
 
+        // File Summaries and Tables Section
+        if (fileSummaries && fileSummaries.length > 0) {
+            fileSummaries.forEach((summary, index) => {
 
-            // Create a responsive container similar to the CodePen example.
-            const containerDiv = document.createElement('div');
-            containerDiv.className = 'container';
-            const rowDiv = document.createElement('div');
-            rowDiv.className = 'row';
-            const colDiv = document.createElement('div');
-            colDiv.className = 'col-xs-12';
+                resultsContainer.appendChild(document.createElement('br'));
+                // Display File Summary with filename
+                const fileSummaryHeader = document.createElement('h3');
+                fileSummaryHeader.textContent = `File Summary: ${file_names[index]}`;
 
-            // Create the table element with the desired classes.
-            const table = document.createElement('table');
-            table.id = 'table-' + fileIndex; // unique id for initialization
-            table.className = 'table table-bordered table-hover dt-responsive';
+                resultsContainer.appendChild(fileSummaryHeader);
 
-            // Create and set the caption (if desired).
-            const caption = document.createElement('caption');
-            caption.className = 'text-center';
-            caption.style.marginBottom = '8px';
-            caption.innerHTML = `Results for <strong>${fileName}</strong>`;
-            table.appendChild(caption);
+                const filePara = document.createElement('p');
+                filePara.textContent = summary ? summary + "\n" : "No summary available for this file.";
+                resultsContainer.appendChild(filePara);
 
-            // Create table header.
-            const thead = document.createElement('thead');
-            thead.innerHTML = `
-            <tr>
-                <th>No</th>
-                <th>Result</th>
-                <th>Relevance</th>
-            </tr>
-            `;
-            table.appendChild(thead);
+                // Display File Results Table
+                const sectionDiv = document.createElement('div');
+                sectionDiv.className = 'file-section';
+                sectionDiv.style.marginBottom = '20px';
 
-            // Create table body.
-            const tbody = document.createElement('tbody');
-            groupedResults[fileName].forEach((item, index) => {
-                const tr = document.createElement('tr');
-                tr.classList.add('clickable-row'); // Add clickable class
+                const containerDiv = document.createElement('div');
+                containerDiv.className = 'container';
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'row';
+                const colDiv = document.createElement('div');
+                colDiv.className = 'col-xs-12';
 
-                const preview = getFirstSentence(item.result);
-                tr.innerHTML = `
-                <td>${index + 1}</td>
-                <td>${preview}</td>
-                <td>${item.relevance ? (item.relevance * 100).toFixed(2) + '%' : 'N/A'}</td>
-            `;
-                // Save the full result so it can be shown on click.
-                tr.dataset.full = item.result || 'N/A';
+                const table = document.createElement('table');
+                table.id = `table-${index}`;
+                table.className = 'table table-bordered table-hover dt-responsive';
 
-                tbody.appendChild(tr);
+                const thead = document.createElement('thead');
+                const headerRow = document.createElement('tr');
+                const thNo = document.createElement('th');
+                thNo.textContent = 'No';
+                const thResult = document.createElement('th');
+                thResult.textContent = 'Result';
+                const thRelevance = document.createElement('th');
+                thRelevance.textContent = 'Relevance';
+                headerRow.appendChild(thNo);
+                headerRow.appendChild(thResult);
+                headerRow.appendChild(thRelevance);
+                thead.appendChild(headerRow);
+                table.appendChild(thead);
 
+                const tbody = document.createElement('tbody');
+                results.forEach((item, resultIndex) => {
+                    const tr = document.createElement('tr');
+                    tr.classList.add('clickable-row');
+
+                    const preview = getFirstSentence(item.result);
+                    tr.innerHTML = `
+                    <td>${resultIndex + 1}</td>
+                    <td>${preview}</td>
+                    <td>${item.relevance}</td>
+                `;
+                    tr.dataset.full = item.result || 'N/A';
+
+                    tbody.appendChild(tr);
+                });
+                table.appendChild(tbody);
+
+                colDiv.appendChild(table);
+                rowDiv.appendChild(colDiv);
+                containerDiv.appendChild(rowDiv);
+                sectionDiv.appendChild(containerDiv);
+                resultsContainer.appendChild(sectionDiv);
+
+                $(`#${table.id}`).DataTable({
+                    responsive: true,
+                    paging: true,
+                    searching: true,
+                    ordering: true,
+                    autoWidth: false,
+                });
+
+                $(`#${table.id} tbody`).on('click', 'tr.clickable-row', function () {
+                    var tableApi = $(`#${table.id}`).DataTable();
+                    var row = tableApi.row(this);
+                    if (row.child.isShown()) {
+                        row.child.hide();
+                        $(this).removeClass('shown');
+                    } else {
+                        row.child(`<div class="full-text">${this.dataset.full}</div>`).show();
+                        $(this).addClass('shown');
+                    }
+                });
             });
-            table.appendChild(tbody);
-
-
-            // Append the table inside the Bootstrap grid structure.
-            colDiv.appendChild(table);
-            rowDiv.appendChild(colDiv);
-            containerDiv.appendChild(rowDiv);
-            sectionDiv.appendChild(containerDiv);
-            resultsContainer.appendChild(sectionDiv);
-
-            // Initialize DataTables on this table.
-            $(`#${table.id}`).DataTable({
-                responsive: true,
-                paging: true,
-                searching: true,
-                ordering: true,
-                autoWidth: false,
-            });
-
-            // Use delegated event binding to toggle the row’s child content.
-            $(`#${table.id} tbody`).on('click', 'tr.clickable-row', function () {
-                var tableApi = $(`#${table.id}`).DataTable();
-                var row = tableApi.row(this);
-                if (row.child.isShown()) {
-                    // Hide child row if visible
-                    row.child.hide();
-                    $(this).removeClass('shown');
-                } else {
-                    // Show child row with full text from data attribute.
-                    row.child(`<div class="full-text">${this.dataset.full}</div>`).show();
-                    $(this).addClass('shown');
-                }
-            });
-
-
-        });
+        }
     }
 
 
 
-
-
-
-    // // Function to display results
-    // function displayResults(results) {
-    //     const resultsTableBody = document.getElementById('resultsTableBody');
-    //     resultsTableBody.innerHTML = ''; // Clear previous results
-
-    //     if (results && results.length > 0) {
-    //         results.forEach((result, index) => {
-    //             // Extract the first sentence for preview or truncate based on 100 words
-    //             const firstSentence = getFirstSentence(result.result) || 'N/A';
-
-    //             // Create a normal table row
-    //             const row = document.createElement('tr');
-    //             row.classList.add('clickable-row');
-
-    //             // Create the short-text cell with only the first sentence or preview text
-    //             const shortTextCell = document.createElement('td');
-    //             shortTextCell.classList.add('short-text');
-    //             shortTextCell.textContent = firstSentence;
-
-    //             // Create the normal row with file name and relevance
-    //             row.innerHTML = `
-    //             <td>${index + 1}</td>
-    //         `;
-    //             row.appendChild(shortTextCell); // Append the dynamically created short-text cell
-    //             row.innerHTML += `
-    //             <td>${result.file_name || 'N/A'}</td> <!-- Display the file name -->
-    //             <td>${result.relevance ? `${(result.relevance * 100).toFixed(2)}%` : 'N/A'}</td>
-    //         `;
-
-    //             // Create a hidden row for full content (full result)
-    //             const extraRow = document.createElement('tr');
-    //             extraRow.classList.add('extra-row');
-    //             extraRow.style.display = 'none'; // Initially hidden
-    //             extraRow.innerHTML = `
-    //             <td colspan="4" class="full-text">${result.result || 'N/A'}</td> <!-- Full text -->
-    //         `;
-
-    //             // Append both rows (normal row and extra row) to the table body
-    //             resultsTableBody.appendChild(row);
-    //             resultsTableBody.appendChild(extraRow);
-    //         });
-
-    //         // Add click event to toggle row visibility (expand/collapse the full content)
-    //         document.querySelectorAll('.clickable-row').forEach((row) => {
-    //             row.addEventListener('click', function () {
-    //                 const nextRow = this.nextElementSibling; // The extra-row
-    //                 if (nextRow && nextRow.classList.contains('extra-row')) {
-    //                     nextRow.style.display = nextRow.style.display === 'none' ? 'table-row' : 'none';
-    //                 }
-    //             });
-    //         });
-
-    //         // Initialize DataTable (if needed)
-    //         if ($.fn.DataTable.isDataTable('#similarityTable')) {
-    //             $('#similarityTable').DataTable().destroy();
-    //         }
-    //         $('#similarityTable').DataTable({
-    //             responsive: true,
-    //             paging: true,
-    //             searching: true,
-    //             ordering: true,
-    //             autoWidth: false,
-    //         });
-
-    //         // Add additional CSS to handle text wrapping in expanded rows
-    //         const style = document.createElement('style');
-    //         style.innerHTML = `
-    //         #similarityTable td.full-text {
-    //             white-space: normal !important;
-    //             word-wrap: break-word !important;
-    //             word-break: break-word !important;
-    //             max-width: 100% !important;
-    //             overflow: visible !important;
-    //             padding: 10px !important;
-    //         }
-
-    //         #similarityTable .extra-row {
-    //             background-color: #f9f9f9;
-    //         }
-    //     `;
-    //         document.head.appendChild(style);
-    //     } else {
-    //         resultsTableBody.innerHTML = '<tr><td colspan="4">No relevant results found.</td></tr>';
-    //     }
-
-    //     // Hide progress bar
-    //     progressBarContainer.style.display = 'none';
-    //     progressText.style.display = 'none';
-    // }
-
-    // Helper function to extract the first 25 words or truncate based on word count
     function getFirstSentence(text) {
         if (!text) return '';
 

@@ -14,6 +14,8 @@ import numpy as np
 from docx import Document as DocxDocument  # For handling DOCX files
 from typing import List, Tuple, Any
 
+from search import fullsummarization, summarize_data
+
 UPLOAD_FOLDER = './uploads'
 PERSIST_DIRECTORY = 'data/db'
 SIMILARITY_THRESHOLD = 0.3  # Cosine similarity threshold
@@ -146,6 +148,15 @@ def get_embeddings():
         model_kwargs={'device': 'cuda' if torch.cuda.is_available() else 'cpu'}
     )
 
+def cosine_similarity(vec1, vec2):
+        vec1 = np.array(vec1)
+        vec2 = np.array(vec2)
+        norm1 = np.linalg.norm(vec1)
+        norm2 = np.linalg.norm(vec2)
+        if norm1 == 0 or norm2 == 0:
+            return 0.0
+        return np.dot(vec1, vec2) / (norm1 * norm2)
+
 # VectorStore class to manage vectorized data
 class VectorStore:
     def __init__(self):
@@ -245,51 +256,96 @@ class VectorStore:
 
 
 
+    def pure_chroma_threshold_search(self, query: str, similarity_threshold: float = 0.3) -> List[Tuple[Any, float]]:
+        """
+        Perform a similarity search on the vector database and optionally rerank the results.
+
+        This function:
+        1. Retrieves the top `k` results with relevance scores from the vector store.
+        2. Normalizes these scores from an assumed range of [-1, 1] to [0, 1].
+        3. Extracts page content from the documents for reranking if available.
+        4. Uses the reranker (if available) to predict a new score based on the query and document's text.
+        5. Returns a list of documents with their scores, sorted in descending order.
+
+        Args:
+            query (str): The search query.
+            k (int, optional): The number of top results to retrieve. Defaults to 30.
+
+        Returns:
+            List[Tuple[Any, float]]: A list of tuples, each containing a document and its corresponding score.
+        """
+        if not self.vectordb:
+            logging.warning("Vector store is not initialized. Returning empty results.")
+            return []
+
+        # Normalize the query.
+        normalized_query = query.lower().strip()
+
+        try:
+            # Step 1: Retrieve initial results from the vector store.
+            raw_results = self.vectordb.similarity_search_with_relevance_scores(normalized_query, k=k)
+            if not raw_results:
+                logging.info(f"No results returned from the vector store for query: '{normalized_query}'")
+                return []
+
+            # Extract valid (doc, score) tuples.
+            results: List[Tuple[Any, float]] = []
+            for res in raw_results:
+                if isinstance(res, (tuple, list)) and len(res) >= 2:
+                    doc, score = res[0], res[1]
+                    results.append((doc, score))
+                else:
+                    logging.debug(f"Skipping result with invalid format: {res}")
+
+            if not results:
+                logging.info(f"No valid results found for query: '{normalized_query}'")
+                return []
+
+            # Step 2: Normalize scores from [-1, 1] to [0, 1].
+            ranked_results = []
+            for doc, score in results:
+                norm_score = (score + 1) / 2  # Normalize to [0, 1]
+                rank = 5 - int(norm_score * 5)  # Map to ranks 1 to 5
+                ranked_results.append((doc, rank))
+
+            # Step 3: Extract page content for reranking.
+            docs_texts = []
+            for doc, _ in ranked_results:
+                content = getattr(doc, 'page_content', None)
+                if content:
+                    docs_texts.append(content)
+                else:
+                    logging.debug(f"Document {doc} does not have a 'page_content' attribute; skipping.")
+
+            # If reranker exists and there are documents to rerank, use it.
+            if hasattr(self, "reranker") and self.reranker is not None and docs_texts:
+                # Prepare (query, document) pairs for reranking.
+                query_doc_pairs = [(normalized_query, doc_text) for doc_text in docs_texts]
+                rerank_scores = self.reranker.predict(query_doc_pairs)
+                if len(rerank_scores) != len(ranked_results):
+                    logging.warning("Mismatch between the number of rerank scores and the number of retrieved documents.")
+                    # Optionally, you can choose to return the normalized results instead.
+                    return sorted(ranked_results, key=lambda x: x[1], reverse=True)
+
+                # Step 4: Combine documents with their rerank scores and sort them.
+                reranked_results = sorted(
+                    [(doc, score) for ((doc, _), score) in zip(ranked_results, rerank_scores)],
+                    key=lambda x: x[1],
+                    reverse=True
+                )
+                return reranked_results
+            else:
+                # If no reranker is available, log info and return normalized results.
+                logging.info("Reranker not available; returning normalized results without reranking.")
+                return sorted(ranked_results, key=lambda x: x[1], reverse=True)
+
+        except Exception as e:
+            logging.error(f"Error during similarity search: {e}", exc_info=True)
+            return []
 
 
 
-    # def similarity_search(self, query, k=30):
-    #     if not self.vectordb:
-    #         logging.warning("Vector store is not initialized. Returning empty results.")
-    #         return []
 
-    #     query = query.lower().strip()
-
-    #     try:
-    #         # Step 1: Retrieve initial results
-    #         raw_results = self.vectordb.similarity_search_with_relevance_scores(query, k=k)
-
-    #         # Extract only (doc, score) from each tuple, ignoring any extra values
-    #         results = [(doc, score) for res in raw_results if isinstance(res, (tuple, list)) and len(res) >= 2 for doc, score in [res[:2]]]
-
-    #         if not results:
-    #             logging.info(f"No relevant results found for query: {query}")
-    #             return []
-
-    #         # Step 2: Normalize scores between 0 and 1
-    #         normalized_results = [(doc, max(0, min((score + 1) / 2, 1))) for doc, score in results]
-
-    #         # Step 3: Prepare for reranking
-    #         docs = [doc.page_content for doc, _ in normalized_results]
-    #         if not docs:
-    #             logging.warning("No documents available for reranking.")
-    #             return []
-
-    #         rerank_scores = reranker.predict([(query, doc) for doc in docs])
-
-    #         # Step 4: Sort by rerank score
-    #         reranked_results = sorted(
-    #             [(doc, rerank_score) for (doc, _), rerank_score in zip(normalized_results, rerank_scores)],
-    #             key=lambda x: x[1],
-    #             reverse=True
-    #         )
-
-    #         # Step 5: Return correct format (doc, score)
-    #         return reranked_results
-
-    #     except Exception as e:
-    #         logging.error(f"Error during similarity search: {str(e)}")
-    #         return []
 
 
 
@@ -342,14 +398,15 @@ class VectorStore:
                 return []
 
             # Step 2: Normalize scores from [-1, 1] to [0, 1].
-            normalized_results = []
+            ranked_results = []
             for doc, score in results:
-                norm_score = max(0.0, min((score + 1) / 2, 1.0))
-                normalized_results.append((doc, norm_score))
+                norm_score = (score + 1) / 2  # Normalize to [0, 1]
+                rank = 5 - int(norm_score * 5)  # Map to ranks 1 to 5
+                ranked_results.append((doc, rank))
 
             # Step 3: Extract page content for reranking.
             docs_texts = []
-            for doc, _ in normalized_results:
+            for doc, _ in ranked_results:
                 content = getattr(doc, 'page_content', None)
                 if content:
                     docs_texts.append(content)
@@ -361,14 +418,14 @@ class VectorStore:
                 # Prepare (query, document) pairs for reranking.
                 query_doc_pairs = [(normalized_query, doc_text) for doc_text in docs_texts]
                 rerank_scores = self.reranker.predict(query_doc_pairs)
-                if len(rerank_scores) != len(normalized_results):
+                if len(rerank_scores) != len(ranked_results):
                     logging.warning("Mismatch between the number of rerank scores and the number of retrieved documents.")
                     # Optionally, you can choose to return the normalized results instead.
-                    return sorted(normalized_results, key=lambda x: x[1], reverse=True)
+                    return sorted(ranked_results, key=lambda x: x[1], reverse=True)
 
                 # Step 4: Combine documents with their rerank scores and sort them.
                 reranked_results = sorted(
-                    [(doc, score) for ((doc, _), score) in zip(normalized_results, rerank_scores)],
+                    [(doc, score) for ((doc, _), score) in zip(ranked_results, rerank_scores)],
                     key=lambda x: x[1],
                     reverse=True
                 )
@@ -376,7 +433,7 @@ class VectorStore:
             else:
                 # If no reranker is available, log info and return normalized results.
                 logging.info("Reranker not available; returning normalized results without reranking.")
-                return sorted(normalized_results, key=lambda x: x[1], reverse=True)
+                return sorted(ranked_results, key=lambda x: x[1], reverse=True)
 
         except Exception as e:
             logging.error(f"Error during similarity search: {e}", exc_info=True)
@@ -417,14 +474,58 @@ def process_file(file_path, file_extension):
 # Singleton instance for use across the Flask application
 vector_store = VectorStore()
 
-def vectorize_and_search(query, k):
-    # Perform similarity search using the singleton vector_store instance
+
+# def vectorize_and_search(query, useLLM, k):
+#     # Perform similarity search using the singleton vector_store instance
+#     try:
+#         if useLLM:
+#             results = vector_store.pure_chroma_threshold_search(query)
+#         else:
+#             results = vector_store.similarity_search(query, k)
+
+#         for doc, score in results:
+#             print(doc.metadata)
+#     except Exception as e:
+#         logging.error(f"Error during vectorization or search: {str(e)}")
+#         return []
+#     return results
+
+
+
+
+
+def vectorize_and_search(query, useLLM, k):
     try:
-        results = vector_store.similarity_search(query, k)
+        # Perform similarity search using the singleton vector_store instance
+        results = (
+            vector_store.pure_chroma_threshold_search(query)
+            if useLLM
+            else vector_store.similarity_search(query, k)
+        )
+
+        # Accumulate content per file using a single loop
+        combined_content = {}
+        file_names = []  # List to store filenames for return
         for doc, score in results:
-            print(doc.metadata)
+            filename = doc.metadata.get("file_name")
+            if filename:  # Ensure filename exists
+                file_names.append(filename)
+                combined_content[filename] = combined_content.get(filename, "") + doc.page_content + "\n"
+
+        # Generate individual summaries using list comprehension
+        summaries = [summarize_data(content) for content in combined_content.values()]
+
+        # Check if only one file is present
+        if len(combined_content) == 1:
+            full_summary = ""  # No need for a full summary if one file
+        else:
+            # Generate a full summary from the individual summaries
+            full_summary = fullsummarization(summaries)
+
+        return results, file_names, summaries, full_summary
+
     except Exception as e:
         logging.error(f"Error during vectorization or search: {str(e)}")
-        return []
-    return results
+        return [], [], [], ""
+
 

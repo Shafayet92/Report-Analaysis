@@ -56,37 +56,49 @@ def start_analysis():
         return jsonify({'error': 'No query provided'}), 400
 
     query = data['query'].strip()
-    k = data.get('similarityAmount')
+    useLLM = data.get('useLLM', False)
+    k = int(data.get('kvalue'))
 
     def run_analysis():
         global progress_data
         with lock:
             progress_data['progress'] = 0
             progress_data['results'] = []
+            progress_data['file_names'] = []
+            progress_data['file_summaries'] = []
+            progress_data['full_summary'] = ""
 
         try:
-            results = vectorize_and_search(query, k)
+            # Unpack the new variables from vectorize_and_search
+            results, file_names, summaries, full_summary = vectorize_and_search(query, useLLM, k)
+
             with lock:
+                # Process document results
                 progress_data['results'] = [
                     {
                         "result": doc.page_content,
                         "relevance": round(score, 4),
-                        "file_name": doc.metadata.get("file_name", "Unknown")  # Ensuring file_name is included
+                        "file_name": doc.metadata.get("file_name", "Unknown")
                     }
                     for doc, score in results
                 ]
+                # Store individual file summaries and the full summary
+                progress_data['file_summaries'] = summaries
+                progress_data['file_names'] = file_names
+                progress_data['full_summary'] = full_summary
                 progress_data['progress'] = 100
 
         except Exception as e:
+            logging.error(f"Error during analysis: {str(e)}", exc_info=True)
             with lock:
                 progress_data['progress'] = 100
                 progress_data['results'] = [
                     {"result": f"Error during analysis: {str(e)}", "relevance": 0, "file_name": "N/A"}
                 ]
 
-
     threading.Thread(target=run_analysis).start()
     return jsonify({"message": "Analysis started"}), 202
+
 
 @app.route('/get_progress', methods=['GET'])
 def get_progress():

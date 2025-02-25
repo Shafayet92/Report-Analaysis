@@ -187,6 +187,7 @@ def multi_agent_pipeline(user_instruction: str, context) -> Optional[str]:
       5. Adds missing insights.
       6. Summarizes into a business report.
       7. Refines the final output.
+      8. Ensure Formal Language
 
     Returns:
          The final must be report Markdown formatted.
