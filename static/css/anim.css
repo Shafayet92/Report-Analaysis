@@ -25,7 +25,7 @@
   height: 100%;
   width: 0;
   background: linear-gradient(90deg, #4caf50, #81c784);
-  transition: width 0.1s linear;
+  transition: width 0.5s linear;
 }
 
 .loader-text {

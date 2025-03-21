@@ -73,15 +73,34 @@ def start_analysis():
             results, file_names, summaries, full_summary = vectorize_and_search(query, useLLM, k)
 
             with lock:
-                # Process document results
-                progress_data['results'] = [
-                    {
-                        "result": doc.page_content,
-                        "relevance": round(score, 4),
-                        "file_name": doc.metadata.get("file_name", "Unknown")
-                    }
-                    for doc, score in results
-                ]
+                # Process document results with relevancy levels
+                progress_data['results'] = []
+                for doc, score in results:
+                    try:
+                        # Handle string-based scores like "High", "Medium", "Low"
+                        if isinstance(score, str):
+                            relevancy = score
+                        else:
+                            # Normalize numeric scores from [-1, 1] to [0, 1]
+                            norm_score = (float(score) + 1) / 2
+
+                            # Assign relevancy levels
+                            if norm_score >= 0.7:
+                                relevancy = "High"
+                            elif norm_score >= 0.4:
+                                relevancy = "Medium"
+                            else:
+                                relevancy = "Low"
+
+                        progress_data['results'].append({
+                            "result": doc.page_content,
+                            "relevance": relevancy,
+                            "file_name": doc.metadata.get("file_name", "Unknown")
+                        })
+
+                    except (ValueError, TypeError) as ve:
+                        logging.error(f"Invalid score value: {score} for doc: {doc}", exc_info=True)
+
                 # Store individual file summaries and the full summary
                 progress_data['file_summaries'] = summaries
                 progress_data['file_names'] = file_names
@@ -93,11 +112,14 @@ def start_analysis():
             with lock:
                 progress_data['progress'] = 100
                 progress_data['results'] = [
-                    {"result": f"Error during analysis: {str(e)}", "relevance": 0, "file_name": "N/A"}
+                    {"result": f"Error during analysis: {str(e)}", "relevance": "N/A", "file_name": "N/A"}
                 ]
 
     threading.Thread(target=run_analysis).start()
     return jsonify({"message": "Analysis started"}), 202
+
+
+
 
 
 @app.route('/get_progress', methods=['GET'])
@@ -139,8 +161,6 @@ def generate_summary_subprocess():
     except Exception as e:
         logging.error(f"Unexpected error: {e}")
         return jsonify({'success': False, 'error': f"Unexpected error: {str(e)}"})
-
-
 
 if __name__ == "__main__":
     vector_store.initialize_store()

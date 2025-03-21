@@ -14,7 +14,7 @@ import numpy as np
 from docx import Document as DocxDocument  # For handling DOCX files
 from typing import List, Tuple, Any
 
-from search import fullsummarization, summarize_data
+from search import fullsummarization, llm_response_search, summarize_data
 
 UPLOAD_FOLDER = './uploads'
 PERSIST_DIRECTORY = 'data/db'
@@ -256,88 +256,68 @@ class VectorStore:
 
 
 
-    def pure_chroma_threshold_search(self, query: str, similarity_threshold: float = 0.3) -> List[Tuple[Any, float]]:
+    def pure_chroma_mode(self, query: str, k: int = 30) -> List[Tuple[Any, str]]:
         """
         Perform a similarity search on the vector database and optionally rerank the results.
-
-        This function:
-        1. Retrieves the top `k` results with relevance scores from the vector store.
-        2. Normalizes these scores from an assumed range of [-1, 1] to [0, 1].
-        3. Extracts page content from the documents for reranking if available.
-        4. Uses the reranker (if available) to predict a new score based on the query and document's text.
-        5. Returns a list of documents with their scores, sorted in descending order.
-
-        Args:
-            query (str): The search query.
-            k (int, optional): The number of top results to retrieve. Defaults to 30.
-
-        Returns:
-            List[Tuple[Any, float]]: A list of tuples, each containing a document and its corresponding score.
         """
         if not self.vectordb:
             logging.warning("Vector store is not initialized. Returning empty results.")
             return []
 
-        # Normalize the query.
+        # Normalize the query
         normalized_query = query.lower().strip()
 
         try:
-            # Step 1: Retrieve initial results from the vector store.
+            # Retrieve initial results from the vector store
             raw_results = self.vectordb.similarity_search_with_relevance_scores(normalized_query, k=k)
             if not raw_results:
                 logging.info(f"No results returned from the vector store for query: '{normalized_query}'")
                 return []
 
-            # Extract valid (doc, score) tuples.
-            results: List[Tuple[Any, float]] = []
-            for res in raw_results:
-                if isinstance(res, (tuple, list)) and len(res) >= 2:
-                    doc, score = res[0], res[1]
-                    results.append((doc, score))
-                else:
-                    logging.debug(f"Skipping result with invalid format: {res}")
-
+            # Process raw results into valid (doc, score) tuples
+            results = [(res[0], res[1]) for res in raw_results if isinstance(res, (tuple, list)) and len(res) >= 2]
             if not results:
                 logging.info(f"No valid results found for query: '{normalized_query}'")
                 return []
 
-            # Step 2: Normalize scores from [-1, 1] to [0, 1].
+            # Normalize scores to [0, 1] and assign relevancy levels
             ranked_results = []
             for doc, score in results:
-                norm_score = (score + 1) / 2  # Normalize to [0, 1]
-                rank = 5 - int(norm_score * 5)  # Map to ranks 1 to 5
-                ranked_results.append((doc, rank))
+                norm_score = (score + 1) / 2  # Normalize from [-1, 1] to [0, 1]
 
-            # Step 3: Extract page content for reranking.
-            docs_texts = []
-            for doc, _ in ranked_results:
-                content = getattr(doc, 'page_content', None)
-                if content:
-                    docs_texts.append(content)
+                # Assign relevancy levels based on normalized score
+                if norm_score >= 0.75:
+                    relevancy = "High"
+                elif norm_score >= 0.6:
+                    relevancy = "Medium"
                 else:
-                    logging.debug(f"Document {doc} does not have a 'page_content' attribute; skipping.")
+                    relevancy = "Low"
 
-            # If reranker exists and there are documents to rerank, use it.
-            if hasattr(self, "reranker") and self.reranker is not None and docs_texts:
-                # Prepare (query, document) pairs for reranking.
+                ranked_results.append((doc, relevancy))
+
+            # Extract page content for reranking
+            docs_texts = [getattr(doc, 'page_content', None) for doc, _ in ranked_results if hasattr(doc, 'page_content')]
+            if not docs_texts:
+                logging.debug("No documents with 'page_content' found for reranking.")
+
+            if hasattr(self, "reranker") and self.reranker and docs_texts:
+                # Rerank the documents if reranker is available
                 query_doc_pairs = [(normalized_query, doc_text) for doc_text in docs_texts]
                 rerank_scores = self.reranker.predict(query_doc_pairs)
-                if len(rerank_scores) != len(ranked_results):
-                    logging.warning("Mismatch between the number of rerank scores and the number of retrieved documents.")
-                    # Optionally, you can choose to return the normalized results instead.
-                    return sorted(ranked_results, key=lambda x: x[1], reverse=True)
 
-                # Step 4: Combine documents with their rerank scores and sort them.
-                reranked_results = sorted(
-                    [(doc, score) for ((doc, _), score) in zip(ranked_results, rerank_scores)],
-                    key=lambda x: x[1],
-                    reverse=True
-                )
-                return reranked_results
-            else:
-                # If no reranker is available, log info and return normalized results.
-                logging.info("Reranker not available; returning normalized results without reranking.")
-                return sorted(ranked_results, key=lambda x: x[1], reverse=True)
+                if len(rerank_scores) == len(ranked_results):
+                    reranked_results = sorted(
+                        [(doc, score) for ((doc, _), score) in zip(ranked_results, rerank_scores)],
+                        key=lambda x: x[1], reverse=True
+                    )
+                    return reranked_results
+                else:
+                    logging.warning("Mismatch between rerank scores and retrieved documents.")
+                    return ranked_results
+
+            # If no reranker, return normalized results
+            logging.info("Reranker not available; returning normalized results.")
+            return ranked_results
 
         except Exception as e:
             logging.error(f"Error during similarity search: {e}", exc_info=True)
@@ -346,98 +326,74 @@ class VectorStore:
 
 
 
-
-
-
-
-
-
-    def similarity_search(self, query: str, k: int = 30) -> List[Tuple[Any, float]]:
+    def chroma_and_LLM_mode(self, query: str, initial_k: int = 10, step: int = 10, max_k: int = 150, llm=None) -> List[Tuple[Any, float]]:
         """
-        Perform a similarity search on the vector database and optionally rerank the results.
+        Retrieve results using pure_chroma_mode() and incrementally expand the search using LLM checks.
 
         This function:
-        1. Retrieves the top `k` results with relevance scores from the vector store.
-        2. Normalizes these scores from an assumed range of [-1, 1] to [0, 1].
-        3. Extracts page content from the documents for reranking if available.
-        4. Uses the reranker (if available) to predict a new score based on the query and document's text.
-        5. Returns a list of documents with their scores, sorted in descending order.
+        - Retrieves results using pure_chroma_mode() with an initial `k`.
+        - Expands the search in increments of `step` until `max_k` or the LLM deems further results irrelevant.
+        - Returns the same format as pure_chroma_mode(), with LLM only used for checking relevance.
 
         Args:
             query (str): The search query.
-            k (int, optional): The number of top results to retrieve. Defaults to 30.
+            initial_k (int): Initial number of results to retrieve.
+            step (int): Increment for each expansion step.
+            max_k (int): Maximum number of results to retrieve.
+            llm: An LLM instance used for determining whether to expand the search.
 
         Returns:
             List[Tuple[Any, float]]: A list of tuples, each containing a document and its corresponding score.
         """
-        if not self.vectordb:
-            logging.warning("Vector store is not initialized. Returning empty results.")
+
+        # Step 1: Initial search using pure_chroma_mode() with `initial_k` results
+        current_k = initial_k
+        results = self.pure_chroma_mode(query, k=current_k)
+
+        # If no results are returned, log the information and return an empty list
+        if not results:
+            logging.info("No results returned from the initial search.")
             return []
 
-        # Normalize the query.
-        normalized_query = query.lower().strip()
+        # Step 2: Start expanding the search by increasing `k` in steps until we reach `max_k`
+        while current_k < max_k:
 
-        try:
-            # Step 1: Retrieve initial results from the vector store.
-            raw_results = self.vectordb.similarity_search_with_relevance_scores(normalized_query, k=k)
-            if not raw_results:
-                logging.info(f"No results returned from the vector store for query: '{normalized_query}'")
-                return []
+            result_to_check = results[-1]  # Check the first from new or last from old batch
 
-            # Extract valid (doc, score) tuples.
-            results: List[Tuple[Any, float]] = []
-            for res in raw_results:
-                if isinstance(res, (tuple, list)) and len(res) >= 2:
-                    doc, score = res[0], res[1]
-                    results.append((doc, score))
-                else:
-                    logging.debug(f"Skipping result with invalid format: {res}")
+            try:
+                # Get the LLM response for checking the relevance of the result to check
+                llm_response = llm_response_search(query, [result_to_check], model="llama3.2").strip().lower()
+                logging.info(f"LLM Response: {llm_response}")
 
-            if not results:
-                logging.info(f"No valid results found for query: '{normalized_query}'")
-                return []
+                # If the LLM response is "no", stop further expansion as additional results are irrelevant
+                if llm_response.startswith("no"):
+                    logging.info("LLM judged additional result as irrelevant. Stopping expansion.")
+                    break
+            except Exception as e:
+                # If an error occurs during LLM evaluation, log it and break out of the loop
+                logging.error(f"Error during LLM evaluation: {e}")
+                break
 
-            # Step 2: Normalize scores from [-1, 1] to [0, 1].
-            ranked_results = []
-            for doc, score in results:
-                norm_score = (score + 1) / 2  # Normalize to [0, 1]
-                rank = 5 - int(norm_score * 5)  # Map to ranks 1 to 5
-                ranked_results.append((doc, rank))
+            # Calculate the next value of k, which is the minimum of current_k + step or max_k
+            next_k = min(current_k + step, max_k)
 
-            # Step 3: Extract page content for reranking.
-            docs_texts = []
-            for doc, _ in ranked_results:
-                content = getattr(doc, 'page_content', None)
-                if content:
-                    docs_texts.append(content)
-                else:
-                    logging.debug(f"Document {doc} does not have a 'page_content' attribute; skipping.")
+            # Step 3: Retrieve additional results using pure_chroma_mode()
+            new_results = self.pure_chroma_mode(query, k=next_k)
 
-            # If reranker exists and there are documents to rerank, use it.
-            if hasattr(self, "reranker") and self.reranker is not None and docs_texts:
-                # Prepare (query, document) pairs for reranking.
-                query_doc_pairs = [(normalized_query, doc_text) for doc_text in docs_texts]
-                rerank_scores = self.reranker.predict(query_doc_pairs)
-                if len(rerank_scores) != len(ranked_results):
-                    logging.warning("Mismatch between the number of rerank scores and the number of retrieved documents.")
-                    # Optionally, you can choose to return the normalized results instead.
-                    return sorted(ranked_results, key=lambda x: x[1], reverse=True)
+            # Ensure there are additional results beyond the current_k (no duplication of old results)
+            if len(new_results) <= current_k:
+                logging.info("No more new results available. Stopping expansion.")
+                break
 
-                # Step 4: Combine documents with their rerank scores and sort them.
-                reranked_results = sorted(
-                    [(doc, score) for ((doc, _), score) in zip(ranked_results, rerank_scores)],
-                    key=lambda x: x[1],
-                    reverse=True
-                )
-                return reranked_results
-            else:
-                # If no reranker is available, log info and return normalized results.
-                logging.info("Reranker not available; returning normalized results without reranking.")
-                return sorted(ranked_results, key=lambda x: x[1], reverse=True)
+            # Step 4: Check the first result of the next batch or last result of the current batch
+            additional_results = new_results[current_k:next_k]  # Get the new results starting from `current_k`
 
-        except Exception as e:
-            logging.error(f"Error during similarity search: {e}", exc_info=True)
-            return []
+            # Step 5: If LLM confirms the relevance of additional results, expand the results
+            results = new_results  # Update results with the newly expanded results
+            current_k = next_k  # Update `current_k` to the next batch for the next iteration
+
+        # Return the final results after considering LLM decisions for relevance
+        return results
 
 
 
@@ -475,32 +431,15 @@ def process_file(file_path, file_extension):
 vector_store = VectorStore()
 
 
-# def vectorize_and_search(query, useLLM, k):
-#     # Perform similarity search using the singleton vector_store instance
-#     try:
-#         if useLLM:
-#             results = vector_store.pure_chroma_threshold_search(query)
-#         else:
-#             results = vector_store.similarity_search(query, k)
-
-#         for doc, score in results:
-#             print(doc.metadata)
-#     except Exception as e:
-#         logging.error(f"Error during vectorization or search: {str(e)}")
-#         return []
-#     return results
-
-
-
 
 
 def vectorize_and_search(query, useLLM, k):
     try:
         # Perform similarity search using the singleton vector_store instance
         results = (
-            vector_store.pure_chroma_threshold_search(query)
+            vector_store.chroma_and_LLM_mode(query)
             if useLLM
-            else vector_store.similarity_search(query, k)
+            else vector_store.pure_chroma_mode(query, k)
         )
 
         # Accumulate content per file using a single loop

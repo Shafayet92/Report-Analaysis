@@ -84,11 +84,14 @@ def retrieval_agent(optimized_instruction: str, context) -> Optional[str]:
     )
     return call_ollama("Retrieval Agent", prompt)
 
-def filtering_agent(retrieved_context: str) -> Optional[str]:
+def filtering_agent(optimized_instruction: str, retrieved_context: str) -> Optional[str]:
     """ Filters out irrelevant, redundant, or low-quality information. """
     prompt = (
         f"""
         Refine the extracted data by removing irrelevant, redundant, or overly generic information.
+
+        Till end Stay related to the topic:
+        ""{optimized_instruction}""
 
         Keep:
         - Specific technical details.
@@ -98,15 +101,20 @@ def filtering_agent(retrieved_context: str) -> Optional[str]:
 
         Ensure the response remains well-structured and improves clarity while maintaining depth.
 
-
+        Context Report:
         "{retrieved_context}"""
     )
     return call_ollama("Filtering Agent", prompt)
 
-def analysis_agent(filtered_context: str) -> Optional[str]:
+def analysis_agent(optimized_instruction: str, filtered_context: str) -> Optional[str]:
     """ Extracts structured key points. """
     prompt = (
-        f"""Analyze the following data and extract the key findings in a **detailed and structured** manner.
+        f"""
+        Till end Stay related to the topic:
+        ""{optimized_instruction}""
+
+
+        Analyze the following data and extract the key findings in a **detailed and structured** manner.
 
         For each key issue:
         - Provide a full explanation with causes and implications.
@@ -115,14 +123,21 @@ def analysis_agent(filtered_context: str) -> Optional[str]:
 
         Use full paragraphs instead of just bullet points to ensure a **comprehensive analysis**.
 
+        retrieved_context Report:
         "{filtered_context}"""
+
+
     )
     return call_ollama("Analysis Agent", prompt)
 
-def contextualization_agent(key_points: str) -> Optional[str]:
+def contextualization_agent(optimized_instruction: str, key_points: str) -> Optional[str]:
     """ Enhances key points with missing insights or explanations. """
     prompt = (
-        f"""Expand on the key points below by **adding missing insights, real-world examples, historical context, and regulatory considerations**.
+        f"""
+        Till end Stay related to the topic:
+        ""{optimized_instruction}""
+
+        Expand on the key points below by **adding missing insights, real-world examples, historical context, and regulatory considerations**.
 
         For each key point:
         - **Explain the background**: Why is this issue important? Has it been a problem in the past?
@@ -132,15 +147,19 @@ def contextualization_agent(key_points: str) -> Optional[str]:
         - **Explore future implications**: How might this issue evolve? Are there emerging technologies or solutions to address it?
 
         Ensure the response has **clear logical flow**, maintains a **formal and professional tone**, and avoids redundant explanations.
-
+        filtered_context Report:
         "{key_points}"""
     )
     return call_ollama("Contextualization Agent", prompt)
 
-def summarization_agent(enhanced_key_points: str) -> Optional[str]:
+def summarization_agent(optimized_instruction: str, enhanced_key_points: str) -> Optional[str]:
     """ Generates a structured business report in Markdown format. """
     prompt = (
-        f"""Using the detailed key points and formal writing, generate a **comprehensive business report**.
+        f"""
+        Till end Stay related to the topic:
+        ""{optimized_instruction}""
+
+        Using the detailed key points and formal writing, generate a **comprehensive business report**.
 
         The report should contain:
         - **Introduction**: A well-written overview explaining the background and significance of the issue.
@@ -149,18 +168,24 @@ def summarization_agent(enhanced_key_points: str) -> Optional[str]:
         - **Ongoing Monitoring & Compliance**: Long-term strategies for maintaining safety and operational standards.
         - **Training & Awareness**: The role of crew education and drills in preventing failures.
         - **Recommendations**: Clear, actionable solutions with explanations.
+        - Avoid phrases like "It appears" or "This content" or "Here are the summaries:" or "Comprehensive Business Report" Or "Optimized Instruction" Or "User Query".
 
         Use full paragraphs, **formal business tone**, and make sure the report is engaging, well-reasoned, and **not too short**.
         Note: Avoid phrases like "It appears" or "This content" or "Here are the summaries:" or "Comprehensive Business Report".
 
+        enhanced_key_points Report:
         "{enhanced_key_points}"""
     )
     return call_ollama("Summarization Agent", prompt)
 
-def refinement_agent(summary_report: str) -> Optional[str]:
+def refinement_agent(optimized_instruction: str, summary_report: str) -> Optional[str]:
     """ Refines the final report for clarity, readability, and proper formatting. """
     prompt = (
-        f"""Refine the following report to ensure **clarity, logical flow, and strong formatting of Markdown**.
+        f"""
+        Till end Stay related to the topic:
+        ""{optimized_instruction}""
+
+        Refine the following report to ensure **clarity, logical flow, and strong formatting of Markdown**.
 
         - Expand on technical explanations where needed.
         - Improve transitions between sections.
@@ -168,7 +193,7 @@ def refinement_agent(summary_report: str) -> Optional[str]:
         - Format properly with headings and well-structured paragraphs.
         - Make output as Markdown formatted.
         - Use only 3rd person formate or formal format to make the report
-        - Avoid phrases like "It appears" or "This content" or "Here are the summaries:" or "Comprehensive Business Report".
+        - Avoid phrases like "It appears" or "This content" or "Here are the summaries:" or "Comprehensive Business Report" Or "Optimized Instruction" Or "User Query" or "Optimized Report".
 
         The final result should read like a **professionally prepared industry report** in Markdown format.
 
@@ -205,31 +230,31 @@ def multi_agent_pipeline(user_instruction: str, context) -> Optional[str]:
         return None
 
     # Step 3: Filter out irrelevant data
-    filtered_context = filtering_agent(retrieved_context)
+    filtered_context = filtering_agent(optimized_instruction, retrieved_context)
     if not filtered_context:
         logging.error("Filtering agent failed.")
         return None
 
     # Step 4: Extract key insights
-    key_points = analysis_agent(filtered_context)
+    key_points = analysis_agent(optimized_instruction, filtered_context)
     if not key_points:
         logging.error("Analysis agent failed.")
         return None
 
     # Step 5: Add missing insights
-    enhanced_key_points = contextualization_agent(key_points)
+    enhanced_key_points = contextualization_agent(optimized_instruction, key_points)
     if not enhanced_key_points:
         logging.error("Contextualization agent failed.")
         return None
 
     # Step 6: Generate structured Markdown report
-    summary_report = summarization_agent(enhanced_key_points)
+    summary_report = summarization_agent(optimized_instruction, enhanced_key_points)
     if not summary_report:
         logging.error("Summarization agent failed.")
         return None
 
     # Step 7: Final refinement
-    final_report = refinement_agent(summary_report)
+    final_report = refinement_agent(optimized_instruction, summary_report)
     if not final_report:
         logging.error("Refinement agent failed.")
         return None

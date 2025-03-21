@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const progressText = document.getElementById("loaderText");
     const loaderWrapper = document.querySelector(".loader-wrapper"); // Added reference to the loader wrapper
 
+    let Press = 0;
 
     // References to the tabs
     const tabs = {
@@ -79,12 +80,31 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Function to fetch summary from the server and display it in summaryContainer
     summaryButton.addEventListener("click", async function () {
+
+
+
         // Check if query input is empty
         const query = queryText.value.trim();
         if (!query) {
             summaryContainer.innerHTML = "<p>Please enter a query before generating a summary.</p>";
             return;
         }
+
+        if (Press !== 0) {
+            summaryContainer.innerHTML = `
+            Generated report content will be displayed here...
+              <div class="loader-wrapper" style="display: none">
+                <div class="loader-container">
+                  <div class="loader-bar">
+                    <div class="loader-fill" id="loaderFill"></div>
+                    <div class="loader-text" id="loaderText">0%</div>
+                  </div>
+                </div>
+              </div>
+            `;
+        }
+
+        Press++;
 
         // Programmatically switch to the Reports tab
         switchTab('report');
